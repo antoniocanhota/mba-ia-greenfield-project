@@ -1,7 +1,7 @@
 ---
 scope_type: ad-hoc
 related_phases: [3]
-status: decidied
+status: decided
 date: 2026-10-06
 scope_description: "Phase 03 — which video metadata the worker extracts, when it becomes visible, how it is persisted and exposed in the API contract, how probe failures surface, and where the studio screen gets the values it displays."
 ---

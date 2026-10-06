@@ -1,7 +1,7 @@
 ---
 scope_type: phase
 related_phases: [3]
-status: decidied
+status: decided
 date: 2026-10-06
 scope_description: "Phase 03 — object storage, background job queue and video worker, resumable 10GB upload protocol (backend + BFF + browser client), video lifecycle status, unique public video IDs, playback format, media delivery for streaming/download, FFmpeg integration and processing-status propagation to the frontend."
 ---
