@@ -3,7 +3,8 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-06T11:14:53-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-06T15:19:36-03:00"
+  docs/decisions/technical-decisions-video-metadata.md: "2026-10-06T15:19:36-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-09-28T14:55:47-03:00"
@@ -38,7 +39,7 @@ sources_mtime:
 
 **Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
 
-**Affected subprojects:** _None named explicitly in the phase body._
+**Affected subprojects:** _No subproject paths are named in the Phase 03 section._
 
 **Deferred subprojects:** _None._
 
@@ -46,28 +47,34 @@ sources_mtime:
 
 **Neighbors (for boundary detection only):**
 
-- **Phase 02:** Cadastro, Login e Gerenciamento de Conta — "> Depende de: Fase 01"
-- **Phase 04:** Gerenciamento de Vídeos e Canal — "> Depende de: Fase 02, Fase 03"
+- **Phase 02:** Fase 02 — Cadastro, Login e Gerenciamento de Conta (Depende de: Fase 01)
+- **Phase 04:** Fase 04 — Gerenciamento de Vídeos e Canal (Depende de: Fase 02, Fase 03)
 
 ## Decisions Index
 
-| Ref | Source | Scope | Topic | Capability | Status | Decision | Libraries |
-|-----|--------|-------|-------|------------|--------|----------|-----------|
-| phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | Serviço de armazenamento de arquivos (vídeos e thumbnails) | decided | A (MinIO) | — |
-| phase-03-videos/TD-02 | phase | Backend | Background Job Queue | Serviço de processamento em segundo plano (filas) | decided | A (BullMQ + Redis) | — |
-| phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | Transversal — covers: Serviço de processamento em segundo plano (filas); Processamento automático do vídeo após upload (extração de duração e metadados); Geração automática de thumbnail a partir de um frame do vídeo | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
-| phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | decided | A (presigned S3 multipart) | — |
-| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | decided | A (Uppy 6 headless) | — |
-| phase-03-videos/TD-06 | phase | Cross-layer | Video Lifecycle Status Model | Transversal — covers: Pré-cadastro automático do vídeo como rascunho ao iniciar o upload; Processamento automático do vídeo após upload (extração de duração e metadados) | decided | B (Two orthogonal fields) | — |
-| phase-03-videos/TD-07 | phase | Cross-layer | Public Video Identifier for Unique URLs | URL única por vídeo, sem conflito com outros vídeos | decided | B (Random 11-char base64url) | — |
-| phase-03-videos/TD-08 | phase | Cross-layer | Playback Format and Processing Scope | Transversal — covers: Reprodução via streaming (sem necessidade de download completo); Processamento automático do vídeo após upload (extração de duração e metadados) | decided | A (Normalize to a single progressive MP4) | — |
-| phase-03-videos/TD-09 | phase | Cross-layer | Media Delivery Path and Access (Streaming, Download, Thumbnails) | Transversal — covers: Reprodução via streaming (sem necessidade de download completo); Download do vídeo pelo usuário; Geração automática de thumbnail a partir de um frame do vídeo | decided | B (hybrid) | — |
-| phase-03-videos/TD-10 | phase | Backend | FFmpeg Integration | Transversal — covers: Processamento automático do vídeo após upload (extração de duração e metadados); Geração automática de thumbnail a partir de um frame do vídeo | decided | B (`fluent-ffmpeg` + system ffmpeg) | — |
-| phase-03-videos/TD-11 | phase | Cross-layer | Processing-Status Propagation to the Frontend | Processamento automático do vídeo após upload (extração de duração e metadados) | decided | A (short polling through the BFF) | — |
+| Ref | Source | Scope | Topic | Status | Decision | Libraries |
+|-----|--------|-------|-------|--------|----------|-----------|
+| phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | decided | A (MinIO) | — |
+| phase-03-videos/TD-02 | phase | Backend | Background Job Queue | decided | A (BullMQ + Redis) | — |
+| phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
+| phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | decided | A (presigned S3 multipart) | — |
+| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | A (Uppy 6 headless) | — |
+| phase-03-videos/TD-06 | phase | Cross-layer | Video Lifecycle Status Model | decided | B (Two orthogonal fields) | — |
+| phase-03-videos/TD-07 | phase | Cross-layer | Public Video Identifier for Unique URLs | decided | B (Random 11-char base64url) | — |
+| phase-03-videos/TD-08 | phase | Cross-layer | Playback Format and Processing Scope | decided | A (Normalize to a single progressive MP4) | — |
+| phase-03-videos/TD-09 | phase | Cross-layer | Media Delivery Path and Access (Streaming, Download, Thumb… | decided | B (hybrid) | — |
+| phase-03-videos/TD-10 | phase | Backend | FFmpeg Integration | decided | B (fluent-ffmpeg + system ffmpeg) | — |
+| phase-03-videos/TD-11 | phase | Cross-layer | Processing-Status Propagation to the Frontend | decided | A (short polling through the BFF) | — |
+| video-metadata/TD-01 | ad-hoc | Cross-layer | Metadata Set and Persistence Shape | decided | A (Minimal typed fields only) | — |
+| video-metadata/TD-02 | ad-hoc | Cross-layer | Metadata Extraction Timing and Source of Truth | decided | C (Two-stage — provisional from original, authoritative from output) | — |
+| video-metadata/TD-03 | ad-hoc | Cross-layer | Metadata Value Contract (duration unit, display dimensions… | decided | A (Raw numeric fields; frontend derives labels) | — |
+| video-metadata/TD-04 | ad-hoc | Cross-layer | Processing Failure Reason Contract | decided | B (Machine-readable failureReason enum) | — |
+| video-metadata/TD-05 | ad-hoc | Frontend | Metadata Shown While the Upload Is Still Running | decided | A (Server values only; placeholders until probe runs) | — |
 
 _Source files:_
 
 - phase-03-videos — `docs/decisions/technical-decisions-phase-03-videos.md` (scope_type: phase, related_phases: [3])
+- video-metadata — `docs/decisions/technical-decisions-video-metadata.md` (scope_type: ad-hoc, related_phases: [3])
 
 ## Capability Coverage
 
@@ -77,7 +84,7 @@ _Source files:_
 | Serviço de processamento em segundo plano (filas) | phase-03-videos/TD-02, phase-03-videos/TD-03 |
 | Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | phase-03-videos/TD-04, phase-03-videos/TD-05 |
 | Pré-cadastro automático do vídeo como rascunho ao iniciar o upload | phase-03-videos/TD-06 |
-| Processamento automático do vídeo após upload (extração de duração e metadados) | phase-03-videos/TD-03, phase-03-videos/TD-06, phase-03-videos/TD-08, phase-03-videos/TD-10, phase-03-videos/TD-11 |
+| Processamento automático do vídeo após upload (extração de duração e metadados) | phase-03-videos/TD-03, phase-03-videos/TD-06, phase-03-videos/TD-08, phase-03-videos/TD-10, phase-03-videos/TD-11, video-metadata/TD-01, video-metadata/TD-02, video-metadata/TD-03, video-metadata/TD-04, video-metadata/TD-05 |
 | Geração automática de thumbnail a partir de um frame do vídeo | phase-03-videos/TD-03, phase-03-videos/TD-09, phase-03-videos/TD-10 |
 | URL única por vídeo, sem conflito com outros vídeos | phase-03-videos/TD-07 |
 | Reprodução via streaming (sem necessidade de download completo) | phase-03-videos/TD-08, phase-03-videos/TD-09 |
@@ -138,6 +145,31 @@ _Source files:_
 ### phase-03-videos/TD-11
 
 **Recommendation:** Processing takes seconds to minutes, so a few seconds of polling latency is invisible to the user. Polling reuses the exact Route Handler + MSW patterns already in place. SSE and WebSocket would bring long-lived-connection auth and a pub/sub channel, and WebSocket would also break strict BFF, all for a sub-second improvement nobody notices here.
+**Libraries:** —
+
+### video-metadata/TD-01
+
+**Recommendation:** The contract carries only what screens use, so the FE side is identical to Option A. The worker already holds the full probe object (fluent-ffmpeg returns it in one call), so keeping it costs a column and saves a 10GB re-download whenever someone needs another field or has to explain a failure. Option A is equivalent if you don't value diagnostics. Option C is extrapolation with no consuming screen.
+**Libraries:** —
+
+### video-metadata/TD-02
+
+**Recommendation:** Probing the original is already paid for by TD-08, so exposing it costs one write. It answers the inventory's open question with real data instead of placeholders for the whole `processing` window, which matters on the transcode path. The final probe keeps the "what you see is what you download" guarantee. Choose Option A if a single write is preferred and placeholders during processing are acceptable.
+**Libraries:** —
+
+### video-metadata/TD-03
+
+**Recommendation:** It keeps the contract numeric and stable across Phases 03–07 while presentation stays where the copy lives. The two choices that matter for correctness, integer milliseconds and rotation-applied display dimensions, are fixed once at the source in the worker. Option B only pays off with a second non-web client, which the project doesn't have.
+**Libraries:** —
+
+### video-metadata/TD-04
+
+**Recommendation:** A small enum makes `failed` actionable for the user. It follows the project's habit of typed contracts flowing through OpenAPI to `types.gen.ts`, and stderr stays server-side. Product policies such as maximum duration or resolution, if adopted, become new codes rather than new mechanisms.
+**Libraries:** —
+
+### video-metadata/TD-05
+
+**Recommendation:** It keeps the screen driven by one contract. Paired with TD-02 Option C, the real values appear seconds after the upload completes. Option B is a purely additive FE enhancement that can be added later without touching the backend or the contract.
 **Libraries:** —
 
 ## Inherited Decisions Detail
@@ -331,12 +363,12 @@ _Source files:_
 
 ## Inherited Conventions
 
-- Backend config uses `@nestjs/config` with namespaced `registerAs(name, () => ({...}))` factories — one file per domain in `src/config/`. _(from phase 01, via phase-02-auth)_
-- Env variables are validated by a Joi schema in `src/config/env.validation.ts`, passed to `ConfigModule.forRoot({ validationSchema, validationOptions... _(from phase 01, via phase-02-auth)_
-- Config is injected into modules via `ConfigType<typeof xxxConfig>` and `@Inject(xxxConfig.KEY)`; the same factory is importable as a plain function... _(from phase 01, via phase-02-auth)_
-- `data-source.ts` loads `.env` via `import 'dotenv/config'` at the top, then imports `databaseConfig` and calls it as a plain function. _(from phase 01, via phase-02-auth)_
-- Database connection parameters (host, port, etc.) are sourced from a single `databaseConfig` factory — never duplicated between `AppModule` and... _(from phase 01, via phase-02-auth)_
-- `TypeOrmModule.forRootAsync` is used (not `forRoot`), with `imports: [ConfigModule]`, `inject: [databaseConfig.KEY]`, `useFactory` returning options... _(from phase 01, via phase-02-auth)_
+- Backend config uses `@nestjs/config` with namespaced `registerAs(name, () => ({...}))` factories — one file per domain in `src/config/`. _(from phase 01)_
+- Env variables are validated by a Joi schema in `src/config/env.validation.ts`, passed to `ConfigModule.forRoot({ validationSchema, validationOptions:... _(from phase 01)_
+- Config is injected into modules via `ConfigType<typeof xxxConfig>` and `@Inject(xxxConfig.KEY)`; the same factory is importable as a plain function... _(from phase 01)_
+- `data-source.ts` loads `.env` via `import 'dotenv/config'` at the top, then imports `databaseConfig` and calls it as a plain function. _(from phase 01)_
+- Database connection parameters (host, port, etc.) are sourced from a single `databaseConfig` factory — never duplicated between `AppModule` and... _(from phase 01)_
+- `TypeOrmModule.forRootAsync` is used (not `forRoot`), with `imports: [ConfigModule]`, `inject: [databaseConfig.KEY]`, `useFactory` returning options... _(from phase 01)_
 
 _Bullets truncated at 150 chars by the extraction contract; full text at `docs/phases/phase-02-auth/context.md` § Inherited Conventions._
 
