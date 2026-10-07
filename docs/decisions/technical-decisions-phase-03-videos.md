@@ -53,8 +53,13 @@ _Subprojects in scope:_
 **Recommendation:** **Option B (RustFS) + `@aws-sdk/client-s3` v3.** RustFS keeps the MinIO workflow the C4 diagram assumed and supports every S3 feature this phase needs (presigned multipart, CORS, lifecycle), without starting the project on an archived image. The app only uses the S3 API through the AWS SDK, so if RustFS shows a fidelity gap, swapping to SeaweedFS (Option C, the close second) only changes the Compose service. Consequence for the env contract: the API needs an **internal** endpoint (`http://<storage-service>:9000`, per the Docker-networking rule) for server-side calls, plus a **browser-reachable public** endpoint (`http://localhost:9000` in dev) used only when presigning URLs. Signing is offline, so a second `S3Client` configured with the public endpoint and `forcePathStyle: true` produces URLs the browser can resolve.
 
 **Decision:** A (MinIO)
+**Libraries:** @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
 
 **Notes:** It is old but it is the recommended option for this exercise.
+
+**Revisions:**
+
+- 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in Compose; RustFS/SeaweedFS stay drop-in fallbacks because the app only uses the S3 API through the AWS SDK. _Rationale:_ Archived image accepted for dev-only use.
 
 ---
 
@@ -86,6 +91,7 @@ _Subprojects in scope:_
 **Recommendation:** **Option A (BullMQ + Redis).** It is the only option with a first-party Nest 11 integration that fits the CommonJS build. Its progress API and stalled-job detection match long FFmpeg jobs, and `jobId = videoId` makes enqueue idempotent, which contains the dual-write risk with a simple sweep. pg-boss's transactional enqueue is a genuine advantage, but here it costs an ESM migration or a pinned old major plus a hand-written integration.
 
 **Decision:** A (BullMQ + Redis)
+**Libraries:** bullmq, @nestjs/bullmq
 
 ---
 
@@ -151,6 +157,12 @@ _Subprojects in scope:_
 
 **Decision:** A (presigned S3 multipart)
 
+**Revisions:**
+
+- 2026-10-07 — Abandoned uploads get a bounded lifetime: a bucket lifecycle rule `AbortIncompleteMultipartUpload` after 1 day, plus a BullMQ repeatable sweep that marks drafts still uploading after 24h as `failed` with `failureReason: upload_abandoned` (see `video-metadata/TD-04`). _Rationale:_ Phase 03 has no explicit upload cancel, so orphan parts and stale drafts need cleanup (resolves AMB-1 of phase-03 validation).
+- 2026-10-07 — Resume scope is the browser session only. When a file is re-attached to the same draft after a reload or direct access mid-upload (the "Envio interrompido" state), the client starts a **new** multipart upload for the draft's object key and the whole file is sent again. The previous multipart is aborted best-effort (`AbortMultipartUpload` via `signRequest`), and the 1-day `AbortIncompleteMultipartUpload` lifecycle rule is the backstop. `uploadId` is not persisted on the draft and there is no list-parts BFF read. _Rationale:_ Restart: new multipart. Uppy 6's documented API has no way to resume a known `uploadId` after a reload without `@uppy/golden-retriever`, which was not adopted (resolves AMB-3 of phase-03 validation).
+- 2026-10-07 — This replaces the "aborted best-effort via `signRequest`" clause in the previous entry, which could not run because no one holds the old `uploadId` after a reload. When the API signs a `CreateMultipartUpload` for a draft's object key, it first calls `ListMultipartUploads` with `Prefix` set to that key and runs `AbortMultipartUpload` on every in-progress upload it returns. The new upload does not exist yet at signing time, so it is never affected. Cleanup runs server-side only: no `uploadId` is persisted and the client is not involved. The 1-day `AbortIncompleteMultipartUpload` lifecycle rule stays as the backstop. _Rationale:_ API aborts by key (resolves AMB-5 of phase-03 validation).
+
 ---
 
 ## TD-05: Browser Upload Client
@@ -176,6 +188,7 @@ _Subprojects in scope:_
 **Recommendation:** **Option A (Uppy 6 headless).** Resumable parallel multipart is exactly the hard, edge-case-heavy code Uppy exists to own. The `signRequest` model maps onto a single BFF route, which fits strict BFF, and the `HeadObject` verification the API needs anyway (TD-04 size cap) also covers the client-side completion trade-off.
 
 **Decision:** Option A (Uppy 6 headless)
+**Libraries:** @uppy/core, @uppy/aws-s3
 
 ---
 
@@ -202,6 +215,10 @@ _Subprojects in scope:_
 **Recommendation:** **Option B.** Phase 03 owns the processing pipeline and Phase 04 owns publication, so separate fields keep those concerns separate. The OpenAPI contract the FE codegen consumes stays stable across phases instead of being reshaped in Phase 04.
 
 **Decision:** B (Two orthogonal fields)
+
+**Revisions:**
+
+- 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of `failed`, whatever the `failureReason` (including `upload_abandoned`), so no file can be re-attached to a failed draft. Re-uploading means creating a new draft from `/studio/upload`. The failed draft keeps its `publicId` and stays until Phase 04 adds video management. On `/studio/videos/[publicId]` the `failed` state shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching to the same draft (the "Envio interrompido" state) is allowed only while `processing_status = awaiting_upload`. _Rationale:_ failed is terminal. This is consistent with the `TD-08` revision ("a failed video is re-uploaded rather than reprocessed") (resolves AMB-4 of phase-03 validation).
 
 ---
 
@@ -270,6 +287,10 @@ _Subprojects in scope:_
 
 **Decision:** A (Normalize to a single progressive MP4)
 
+**Revisions:**
+
+- 2026-10-07 — The original upload object is deleted as soon as processing reaches a terminal state: after the normalized MP4 is stored (`ready`) and also on `failed`. Only the normalized MP4 is retained. _Rationale:_ "Keeps one stored file" applies to every terminal state; a failed video is re-uploaded rather than reprocessed from the original (resolves AMB-2 of phase-03 validation).
+
 ---
 
 ## TD-09: Media Delivery Path and Access (Streaming, Download, Thumbnails)
@@ -336,8 +357,13 @@ _Subprojects in scope:_
 **Recommendation:** **Option A.** The project already runs everything in a controlled Docker image, so apt-installed ffmpeg plus a small typed spawn wrapper is the least-dependency, best-tested path. Option B is dead upstream, and Option C solves a portability problem the project doesn't have.
 
 **Decision:** B (`fluent-ffmpeg` + system ffmpeg)
+**Libraries:** fluent-ffmpeg
 
 **Note:** Option B chosen for a easier implementation. Option A in the future.
+
+**Revisions:**
+
+- 2026-10-07 — The unmaintained-dependency risk of `fluent-ffmpeg` is accepted. Usage is limited to the ffprobe JSON probe and the remux, transcode and thumbnail commands; Option A (typed `spawn` wrapper) stays the planned replacement. _Rationale:_ Unmaintained dep accepted for API ergonomics.
 
 ---
 
@@ -369,6 +395,10 @@ _Subprojects in scope:_
 **Recommendation:** **Option A (polling).** Processing takes seconds to minutes, so a few seconds of polling latency is invisible to the user. Polling reuses the exact Route Handler + MSW patterns already in place. SSE and WebSocket would bring long-lived-connection auth and a pub/sub channel, and WebSocket would also break strict BFF, all for a sub-second improvement nobody notices here.
 
 **Decision:** A (short polling through the BFF)
+
+**Revisions:**
+
+- 2026-10-06 — Client mechanism pinned: hand-rolled hook (setTimeout chain + fetch to the BFF), no SWR/TanStack; ~3s interval, stops at ready/failed. _Rationale:_ Option A was chosen to "reuse existing patterns only (Route Handler + `fetch` + MSW handler)"; one polling consumer in Phase 03 doesn't justify a new client data-fetching library, and `next-frontend-openapi-typing/TD-01` reserves TanStack Query adoption for when client-side fetching grows. The hook polls `GET /api/videos/{id}` while `processing_status ∈ {uploaded, processing}`, schedules the next request only after the previous one settles (no overlapping requests), and stops at a terminal state.
 
 ---
 

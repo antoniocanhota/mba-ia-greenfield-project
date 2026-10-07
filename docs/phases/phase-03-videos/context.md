@@ -3,8 +3,8 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-06T15:19:36-03:00"
-  docs/decisions/technical-decisions-video-metadata.md: "2026-10-06T15:19:36-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-07T15:18:52-03:00"
+  docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-09-28T14:55:47-03:00"
@@ -54,22 +54,30 @@ sources_mtime:
 
 | Ref | Source | Scope | Topic | Status | Decision | Libraries |
 |-----|--------|-------|-------|--------|----------|-----------|
-| phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | decided | A (MinIO) | — |
-| phase-03-videos/TD-02 | phase | Backend | Background Job Queue | decided | A (BullMQ + Redis) | — |
+| phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | decided | A (MinIO) | @aws-sdk/client-s3, @aws-sdk/s3-request-presigner |
+|     └─ Last revision: 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in… | | | | | | |
+| phase-03-videos/TD-02 | phase | Backend | Background Job Queue | decided | A (BullMQ + Redis) | bullmq, @nestjs/bullmq |
 | phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
 | phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | decided | A (presigned S3 multipart) | — |
-| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | A (Uppy 6 headless) | — |
+|     └─ Last revision: 2026-10-07 — This replaces the "aborted best-effort via `signRequest`" clause in the… | | | | | | |
+| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | A (Uppy 6 headless) | @uppy/core, @uppy/aws-s3 |
 | phase-03-videos/TD-06 | phase | Cross-layer | Video Lifecycle Status Model | decided | B (Two orthogonal fields) | — |
+|     └─ Last revision: 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of… | | | | | | |
 | phase-03-videos/TD-07 | phase | Cross-layer | Public Video Identifier for Unique URLs | decided | B (Random 11-char base64url) | — |
 | phase-03-videos/TD-08 | phase | Cross-layer | Playback Format and Processing Scope | decided | A (Normalize to a single progressive MP4) | — |
+|     └─ Last revision: 2026-10-07 — The original upload object is deleted as soon as processing reaches a terminal… | | | | | | |
 | phase-03-videos/TD-09 | phase | Cross-layer | Media Delivery Path and Access (Streaming, Download, Thumb… | decided | B (hybrid) | — |
-| phase-03-videos/TD-10 | phase | Backend | FFmpeg Integration | decided | B (fluent-ffmpeg + system ffmpeg) | — |
+| phase-03-videos/TD-10 | phase | Backend | FFmpeg Integration | decided | B (`fluent-ffmpeg` + system ffmpeg) | fluent-ffmpeg |
+|     └─ Last revision: 2026-10-07 — The unmaintained-dependency risk of `fluent-ffmpeg` is accepted. Usage is… | | | | | | |
 | phase-03-videos/TD-11 | phase | Cross-layer | Processing-Status Propagation to the Frontend | decided | A (short polling through the BFF) | — |
+|     └─ Last revision: 2026-10-06 — Client mechanism pinned: hand-rolled hook (setTimeout chain + fetch to the… | | | | | | |
 | video-metadata/TD-01 | ad-hoc | Cross-layer | Metadata Set and Persistence Shape | decided | A (Minimal typed fields only) | — |
+|     └─ Last revision: 2026-10-07 — No raw-probe column is persisted: the Recommendation's internal `jsonb` probe… | | | | | | |
 | video-metadata/TD-02 | ad-hoc | Cross-layer | Metadata Extraction Timing and Source of Truth | decided | C (Two-stage — provisional from original, authoritative from output) | — |
 | video-metadata/TD-03 | ad-hoc | Cross-layer | Metadata Value Contract (duration unit, display dimensions… | decided | A (Raw numeric fields; frontend derives labels) | — |
-| video-metadata/TD-04 | ad-hoc | Cross-layer | Processing Failure Reason Contract | decided | B (Machine-readable failureReason enum) | — |
-| video-metadata/TD-05 | ad-hoc | Frontend | Metadata Shown While the Upload Is Still Running | decided | A (Server values only; placeholders until probe runs) | — |
+| video-metadata/TD-04 | ad-hoc | Cross-layer | Processing Failure Reason Contract | decided | B (Machine-readable `failureReason` enum) | — |
+|     └─ Last revision: 2026-10-07 — Adds the `upload_abandoned` code, set by the abandoned-upload sweep from the… | | | | | | |
+| video-metadata/TD-05 | ad-hoc | Frontend | Metadata Shown While the Upload Is Still Running | decided | A (Server values only; placeholders until the probe runs) | — |
 
 _Source files:_
 
@@ -95,12 +103,15 @@ _Source files:_
 ### phase-03-videos/TD-01
 
 **Recommendation:** RustFS keeps the MinIO workflow the C4 diagram assumed and supports every S3 feature this phase needs (presigned multipart, CORS, lifecycle), without starting the project on an archived image. The app only uses the S3 API through the AWS SDK, so if RustFS shows a fidelity gap, swapping to SeaweedFS (Option C, the close second) only changes the Compose service. Consequence for the env contract: the API needs an **internal** endpoint (`http://<storage-service>:9000`, per the Docker-networking rule) for server-side calls, plus a **browser-reachable public** endpoint (`http://localhost:9000` in dev) used only when presigning URLs. Signing is offline, so a second `S3Client` configured with the public endpoint and `forcePathStyle: true` produces URLs the browser can resolve.
-**Libraries:** —
+**Libraries:** @aws-sdk/client-s3, @aws-sdk/s3-request-presigner
+
+**Revisions:**
+- 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in Compose; RustFS/SeaweedFS stay drop-in fallbacks because the app only uses the S3 API through the AWS SDK. _Rationale:_ Archived image accepted for dev-only use.
 
 ### phase-03-videos/TD-02
 
 **Recommendation:** It is the only option with a first-party Nest 11 integration that fits the CommonJS build. Its progress API and stalled-job detection match long FFmpeg jobs, and `jobId = videoId` makes enqueue idempotent, which contains the dual-write risk with a simple sweep. pg-boss's transactional enqueue is a genuine advantage, but here it costs an ESM migration or a pinned old major plus a hand-written integration.
-**Libraries:** —
+**Libraries:** bullmq, @nestjs/bullmq
 
 ### phase-03-videos/TD-03
 
@@ -112,15 +123,23 @@ _Source files:_
 **Recommendation:** It is the only option that meets all three constraints at once: resume after failure, no load on the API, and strict BFF unchanged. The BFF and Nest only handle a few small JSON requests per upload while the 10GB goes straight to storage, which is exactly the path `next-frontend-config-base/TD-03` reserved for media.
 **Libraries:** —
 
+**Revisions:**
+- 2026-10-07 — Abandoned uploads get a bounded lifetime: a bucket lifecycle rule `AbortIncompleteMultipartUpload` after 1 day, plus a BullMQ repeatable sweep that marks drafts still uploading after 24h as `failed` with `failureReason: upload_abandoned` (see `video-metadata/TD-04`). _Rationale:_ Phase 03 has no explicit upload cancel, so orphan parts and stale drafts need cleanup (resolves AMB-1 of phase-03 validation).
+- 2026-10-07 — Resume scope is the browser session only. When a file is re-attached to the same draft after a reload or direct access mid-upload (the "Envio interrompido" state), the client starts a **new** multipart upload for the draft's object key and the whole file is sent again. The previous multipart is aborted best-effort (`AbortMultipartUpload` via `signRequest`), and the 1-day `AbortIncompleteMultipartUpload` lifecycle rule is the backstop. `uploadId` is not persisted on the draft and there is no list-parts BFF read. _Rationale:_ Restart: new multipart. Uppy 6's documented API has no way to resume a known `uploadId` after a reload without `@uppy/golden-retriever`, which was not adopted (resolves AMB-3 of phase-03 validation).
+- 2026-10-07 — This replaces the "aborted best-effort via `signRequest`" clause in the previous entry, which could not run because no one holds the old `uploadId` after a reload. When the API signs a `CreateMultipartUpload` for a draft's object key, it first calls `ListMultipartUploads` with `Prefix` set to that key and runs `AbortMultipartUpload` on every in-progress upload it returns. The new upload does not exist yet at signing time, so it is never affected. Cleanup runs server-side only: no `uploadId` is persisted and the client is not involved. The 1-day `AbortIncompleteMultipartUpload` lifecycle rule stays as the backstop. _Rationale:_ API aborts by key (resolves AMB-5 of phase-03 validation).
+
 ### phase-03-videos/TD-05
 
 **Recommendation:** Resumable parallel multipart is exactly the hard, edge-case-heavy code Uppy exists to own. The `signRequest` model maps onto a single BFF route, which fits strict BFF, and the `HeadObject` verification the API needs anyway (TD-04 size cap) also covers the client-side completion trade-off.
-**Libraries:** —
+**Libraries:** @uppy/core, @uppy/aws-s3
 
 ### phase-03-videos/TD-06
 
 **Recommendation:** Phase 03 owns the processing pipeline and Phase 04 owns publication, so separate fields keep those concerns separate. The OpenAPI contract the FE codegen consumes stays stable across phases instead of being reshaped in Phase 04.
 **Libraries:** —
+
+**Revisions:**
+- 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of `failed`, whatever the `failureReason` (including `upload_abandoned`), so no file can be re-attached to a failed draft. Re-uploading means creating a new draft from `/studio/upload`. The failed draft keeps its `publicId` and stays until Phase 04 adds video management. On `/studio/videos/[publicId]` the `failed` state shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching to the same draft (the "Envio interrompido" state) is allowed only while `processing_status = awaiting_upload`. _Rationale:_ failed is terminal. This is consistent with the `TD-08` revision ("a failed video is re-uploaded rather than reprocessed") (resolves AMB-4 of phase-03 validation).
 
 ### phase-03-videos/TD-07
 
@@ -132,6 +151,9 @@ _Source files:_
 **Recommendation:** It makes "streaming without full download" true for every accepted upload. The cost stays low in the common H.264 case (remux only) and the worker absorbs the rare transcode, which is what the background worker exists for. Unlike HLS, it keeps one stored file, which addresses the storage-cost point in "Pontos de Atenção", and lets the Phase 05 player stay a native `<video>`. ABR can be added later as a Revision without changing the upload contract.
 **Libraries:** —
 
+**Revisions:**
+- 2026-10-07 — The original upload object is deleted as soon as processing reaches a terminal state: after the normalized MP4 is stored (`ready`) and also on `failed`. Only the normalized MP4 is retained. _Rationale:_ "Keeps one stored file" applies to every terminal state; a failed video is re-uploaded rather than reprocessed from the original (resolves AMB-2 of phase-03 validation).
+
 ### phase-03-videos/TD-09
 
 **Recommendation:** Video bytes stay behind API-issued presigned URLs, which keeps the draft, published and unlisted guarantees enforceable and keeps the API out of the data path. Thumbnails get the stable URLs that every list screen in Phases 04 and 07 needs for caching. Video presign TTL should exceed a realistic viewing session (hours, not minutes). "Download pelo usuário" means anyone allowed to watch (Phase 05 places the button on the watch page); in Phase 03, only the owner.
@@ -140,17 +162,26 @@ _Source files:_
 ### phase-03-videos/TD-10
 
 **Recommendation:** The project already runs everything in a controlled Docker image, so apt-installed ffmpeg plus a small typed spawn wrapper is the least-dependency, best-tested path. Option B is dead upstream, and Option C solves a portability problem the project doesn't have.
-**Libraries:** —
+**Libraries:** fluent-ffmpeg
+
+**Revisions:**
+- 2026-10-07 — The unmaintained-dependency risk of `fluent-ffmpeg` is accepted. Usage is limited to the ffprobe JSON probe and the remux, transcode and thumbnail commands; Option A (typed `spawn` wrapper) stays the planned replacement. _Rationale:_ Unmaintained dep accepted for API ergonomics.
 
 ### phase-03-videos/TD-11
 
 **Recommendation:** Processing takes seconds to minutes, so a few seconds of polling latency is invisible to the user. Polling reuses the exact Route Handler + MSW patterns already in place. SSE and WebSocket would bring long-lived-connection auth and a pub/sub channel, and WebSocket would also break strict BFF, all for a sub-second improvement nobody notices here.
 **Libraries:** —
 
+**Revisions:**
+- 2026-10-06 — Client mechanism pinned: hand-rolled hook (setTimeout chain + fetch to the BFF), no SWR/TanStack; ~3s interval, stops at ready/failed. _Rationale:_ Option A was chosen to "reuse existing patterns only (Route Handler + `fetch` + MSW handler)"; one polling consumer in Phase 03 doesn't justify a new client data-fetching library, and `next-frontend-openapi-typing/TD-01` reserves TanStack Query adoption for when client-side fetching grows. The hook polls `GET /api/videos/{id}` while `processing_status ∈ {uploaded, processing}`, schedules the next request only after the previous one settles (no overlapping requests), and stops at a terminal state.
+
 ### video-metadata/TD-01
 
 **Recommendation:** The contract carries only what screens use, so the FE side is identical to Option A. The worker already holds the full probe object (fluent-ffmpeg returns it in one call), so keeping it costs a column and saves a 10GB re-download whenever someone needs another field or has to explain a failure. Option A is equivalent if you don't value diagnostics. Option C is extrapolation with no consuming screen.
 **Libraries:** —
+
+**Revisions:**
+- 2026-10-07 — No raw-probe column is persisted: the Recommendation's internal `jsonb` probe (Option B) is not part of the decided contract. Failure diagnostics come from worker logs plus the `failureReason` enum (TD-04). _Rationale:_ Diagnostics via logs; no unused column.
 
 ### video-metadata/TD-02
 
@@ -166,6 +197,9 @@ _Source files:_
 
 **Recommendation:** A small enum makes `failed` actionable for the user. It follows the project's habit of typed contracts flowing through OpenAPI to `types.gen.ts`, and stderr stays server-side. Product policies such as maximum duration or resolution, if adopted, become new codes rather than new mechanisms.
 **Libraries:** —
+
+**Revisions:**
+- 2026-10-07 — Adds the `upload_abandoned` code, set by the abandoned-upload sweep from the `phase-03-videos/TD-04` revision. Because TD-01 stays on Option A, ffmpeg stderr goes to worker logs only (there is no internal probe column). _Rationale:_ A new product policy becomes a new code, per this TD's Recommendation.
 
 ### video-metadata/TD-05
 
@@ -364,13 +398,11 @@ _Source files:_
 ## Inherited Conventions
 
 - Backend config uses `@nestjs/config` with namespaced `registerAs(name, () => ({...}))` factories — one file per domain in `src/config/`. _(from phase 01)_
-- Env variables are validated by a Joi schema in `src/config/env.validation.ts`, passed to `ConfigModule.forRoot({ validationSchema, validationOptions:... _(from phase 01)_
+- Env variables are validated by a Joi schema in `src/config/env.validation.ts`, passed to `ConfigModule.forRoot({ validationSchema, validationOpt... _(from phase 01)_
 - Config is injected into modules via `ConfigType<typeof xxxConfig>` and `@Inject(xxxConfig.KEY)`; the same factory is importable as a plain function... _(from phase 01)_
 - `data-source.ts` loads `.env` via `import 'dotenv/config'` at the top, then imports `databaseConfig` and calls it as a plain function. _(from phase 01)_
 - Database connection parameters (host, port, etc.) are sourced from a single `databaseConfig` factory — never duplicated between `AppModule` and... _(from phase 01)_
-- `TypeOrmModule.forRootAsync` is used (not `forRoot`), with `imports: [ConfigModule]`, `inject: [databaseConfig.KEY]`, `useFactory` returning options... _(from phase 01)_
-
-_Bullets truncated at 150 chars by the extraction contract; full text at `docs/phases/phase-02-auth/context.md` § Inherited Conventions._
+- `TypeOrmModule.forRootAsync` is used (not `forRoot`), with `imports: [ConfigModule]`, `inject: [databaseConfig.KEY]`, `useFactory` returning... _(from phase 01)_
 
 ## Inherited Deferred Capabilities
 
@@ -439,7 +471,10 @@ _Bullets truncated at 150 chars by the extraction contract; full text at `docs/p
 
 ## Non-UI / Deferred Capabilities
 
-_None._
+| Capability | Status | Rationale | TD refs |
+|-----------|--------|-----------|---------|
+| "Serviço de armazenamento de arquivos (vídeos e thumbnails)" | non-ui | backend_service | phase-03-videos/TD-01 |
+| "Serviço de processamento em segundo plano (filas)" | non-ui | backend_service | phase-03-videos/TD-02, phase-03-videos/TD-03 |
 
 ## Testing Requirements
 

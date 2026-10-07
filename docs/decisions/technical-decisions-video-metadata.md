@@ -51,6 +51,10 @@ _Subprojects in scope:_
 
 **Decision:** A (Minimal typed fields only)
 
+**Revisions:**
+
+- 2026-10-07 — No raw-probe column is persisted: the Recommendation's internal `jsonb` probe (Option B) is not part of the decided contract. Failure diagnostics come from worker logs plus the `failureReason` enum (TD-04). _Rationale:_ Diagnostics via logs; no unused column.
+
 ---
 
 ## TD-02: Metadata Extraction Timing and Source of Truth
@@ -143,6 +147,10 @@ _Subprojects in scope:_
 **Recommendation:** **Option B.** A small enum makes `failed` actionable for the user. It follows the project's habit of typed contracts flowing through OpenAPI to `types.gen.ts`, and stderr stays server-side. Product policies such as maximum duration or resolution, if adopted, become new codes rather than new mechanisms.
 
 **Decision:** B (Machine-readable `failureReason` enum)
+
+**Revisions:**
+
+- 2026-10-07 — Adds the `upload_abandoned` code, set by the abandoned-upload sweep from the `phase-03-videos/TD-04` revision. Because TD-01 stays on Option A, ffmpeg stderr goes to worker logs only (there is no internal probe column). _Rationale:_ A new product policy becomes a new code, per this TD's Recommendation.
 
 ---
 
