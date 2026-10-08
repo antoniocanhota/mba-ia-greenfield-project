@@ -3,9 +3,9 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-07T15:20:25-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-08T08:08:31-03:00"
   docs/phases/phase-03-videos/library-refs.md: "2026-10-07T15:20:25-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-07T15:18:52-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-08T08:04:12-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
@@ -128,7 +128,7 @@ Entregar o upload de vídeos de até 10GB sem impacto na performance — com ser
 **Technical actions:**
 
 1. Criar `components/studio/copy-link-button.tsx` — botão só-ícone com `aria-label`, reusando `components/ui/icon-button.tsx`; copia o texto recebido via prop para o clipboard.
-2. Criar `components/studio/processing-status.tsx` — ícone + caption para um `processing_status` recebido via prop (copy via prop; a copy "Checks complete. No issues found." não é usada, OQ-3).
+2. Criar `components/studio/processing-status.tsx` — ícone + caption para um `processingStatus` recebido via prop (copy via prop; a copy "Checks complete. No issues found." não é usada, OQ-3).
 3. Criar `components/studio/thumb-upload.tsx` — imagem da thumbnail quando `thumbnailUrl` existe; skeleton caso contrário (OQ-10).
 4. Criar `components/studio/upload-dropzone.tsx` — área de drag-and-drop com estados idle / drag-over / carregando / erro inline e o `SelectFilesButton` (`components/ui/button.tsx`), copy singular (OQ-4, OQ-5); emite `onFileSelected(file)`.
 5. Criar `components/studio/upload-progress-panel.tsx` — nome do arquivo, "Uploading... N%", slot de status e `components/ui/progress.tsx` com o mesmo valor (OQ-13).
@@ -311,7 +311,7 @@ Testes de integração usam o MinIO real do Compose, na mesma linha do Mailpit p
 2. Criar `src/videos/exceptions/video.exceptions.ts` — `VideoNotFoundException` (`VIDEO_NOT_FOUND`, 404), `InvalidVideoStateException` (`INVALID_VIDEO_STATE`, 409), `VideoNotReadyException` (`VIDEO_NOT_READY`, 409), `InvalidUploadKeyException` (`INVALID_UPLOAD_KEY`, 400), `UnsupportedUploadOperationException` (`UNSUPPORTED_UPLOAD_OPERATION`, 400), `UploadIncompleteException` (`UPLOAD_INCOMPLETE`, 409), `FileTooLargeException` (`FILE_TOO_LARGE`, 422), estendendo `DomainException` com as mensagens de `### Error Catalog` (per `phase-02-auth/TD-07`).
 3. Criar `src/videos/videos.service.ts` — `createDraft(userId, { filename, sizeBytes, contentType })`: resolve o canal pelo `user_id` via um novo `ChannelsService.findByUserId(userId)` (o `VideosModule` importa `ChannelsModule`; o serviço de vídeos não acessa o repositório de `Channel`), gera o `public_id` e insere; em unique violation de `public_id` regenera e tenta de novo (máx. 3) (per `phase-03-videos/TD-07`, `phase-03-videos/TD-06`).
 4. Em `VideosService`: `findOwnedByPublicId(userId, publicId)` — formato inválido, inexistente ou de outro canal lança `VideoNotFoundException` (per `### Authorization Matrix`).
-5. Criar `src/videos/dto/video-response.dto.ts` + `toVideoResponse(video)` — campos e casing exatamente como `### API Contracts` → `VideoResponseDto` (`publicId`, `filename`, `processing_status`, `publication_status`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes`, `thumbnailUrl` só quando `processing_status = ready`, `createdAt`), com `@ApiProperty` para o OpenAPI (per `openapi-docs-nestjs/TD-01`).
+5. Criar `src/videos/dto/video-response.dto.ts` + `toVideoResponse(video)` — campos e casing exatamente como `### API Contracts` → `VideoResponseDto` (`publicId`, `filename`, `processingStatus`, `publicationStatus` — mapeados das colunas `processing_status`/`publication_status` da entidade per `phase-03-videos/TD-06` revisão 2026-10-08 —, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes`, `thumbnailUrl` só quando `processingStatus = ready`, `createdAt`), com `@ApiProperty` para o OpenAPI (per `openapi-docs-nestjs/TD-01`).
 
 **Tests:**
 
@@ -320,7 +320,7 @@ Testes de integração usam o MinIO real do Compose, na mesma linha do Mailpit p
 | `public-id.util.ts` | Unit: 11 caracteres base64url; validação de formato | `src/videos/public-id.util.spec.ts` |
 | `VideosService` | Unit: retry em colisão de `public_id` (mock repo), ownership negada lança `VideoNotFoundException` | `src/videos/videos.service.spec.ts` |
 | `VideosService` | Integration: rascunho persistido no canal do usuário com defaults; lookup de outro canal lança 404 | `src/videos/videos.service.integration-spec.ts` |
-| `toVideoResponse` | Unit: casing verbatim dos campos; `thumbnailUrl` nulo fora de `ready` | `src/videos/dto/video-response.dto.spec.ts` |
+| `toVideoResponse` | Unit: campos em camelCase no wire (`processingStatus`/`publicationStatus` a partir das colunas snake_case); `thumbnailUrl` nulo fora de `ready` | `src/videos/dto/video-response.dto.spec.ts` |
 
 **Dependencies:** SI-03.2, SI-03.3
 
@@ -361,7 +361,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 **Acceptance criteria:**
 
-- `POST /videos` autenticado com `{ filename, sizeBytes, contentType: "video/mp4" }` válidos retorna `201` com `VideoResponseDto` em `processing_status: "awaiting_upload"` e `publication_status: "draft"`.
+- `POST /videos` autenticado com `{ filename, sizeBytes, contentType: "video/mp4" }` válidos retorna `201` com `VideoResponseDto` em `processingStatus: "awaiting_upload"` e `publicationStatus: "draft"`.
 - `POST /videos` com `sizeBytes` acima de `10737418240` ou `contentType` sem prefixo `video/` retorna `400` com `error: "VALIDATION_ERROR"`.
 - `POST /videos` sem `Authorization` retorna `401`.
 - Mais de 10 requisições por minuto ao controller de vídeos não são limitadas pelo throttler.
@@ -460,7 +460,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 **Acceptance criteria:**
 
-- Com o original no storage, `POST /videos/{publicId}/upload-completion` retorna `200` com `processing_status: "uploaded"` e `sizeBytes` igual ao tamanho do objeto, e um job `process-video` com `jobId` igual ao id interno do vídeo fica na fila `videos`.
+- Com o original no storage, `POST /videos/{publicId}/upload-completion` retorna `200` com `processingStatus: "uploaded"` e `sizeBytes` igual ao tamanho do objeto, e um job `process-video` com `jobId` igual ao id interno do vídeo fica na fila `videos`.
 - Repetir a chamada retorna `200` com o estado atual e não cria um segundo job.
 - Sem o objeto original no storage, retorna `409` com `error: "UPLOAD_INCOMPLETE"`.
 - Com objeto acima de 10 GiB, retorna `422` com `error: "FILE_TOO_LARGE"`, o objeto deixa de existir e o vídeo continua em `awaiting_upload`.
@@ -651,7 +651,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 **Technical actions:**
 
-1. Estender `lib/api/contracts.ts` com uma seção `// ─── Videos` — aliases pass-through `CreateVideoDto`, `VideoResponse` (200 de `GET /videos/{publicId}`), `SignUploadRequestDto`, `SignUploadResponse` (201 de `POST /videos/{publicId}/upload-signatures`) e `MediaUrlsResponse` (200 de `GET /videos/{publicId}/media-urls`), mais os tipos derivados `VideoProcessingStatus = VideoResponse["processing_status"]` e `VideoFailureReason = NonNullable<VideoResponse["failureReason"]>` (per `next-frontend-openapi-typing/TD-04`; shapes per `### API Contracts` → BFF tier).
+1. Estender `lib/api/contracts.ts` com uma seção `// ─── Videos` — aliases pass-through `CreateVideoDto`, `VideoResponse` (200 de `GET /videos/{publicId}`), `SignUploadRequestDto`, `SignUploadResponse` (201 de `POST /videos/{publicId}/upload-signatures`) e `MediaUrlsResponse` (200 de `GET /videos/{publicId}/media-urls`), mais os tipos derivados `VideoProcessingStatus = VideoResponse["processingStatus"]` e `VideoFailureReason = NonNullable<VideoResponse["failureReason"]>` (per `next-frontend-openapi-typing/TD-04`; shapes per `### API Contracts` → BFF tier).
 
 **Tests:** _(empty — type-only aliases; compile-gated por `npx tsc --noEmit`)_
 
@@ -814,13 +814,13 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 | Artifact | Layer | Test file |
 |----------|-------|-----------|
-| `app/api/videos/[publicId]/upload-completion/route.ts` | Integration (MSW) per testing-guide-next-frontend § "Route handler" — 200 com `processing_status: "uploaded"`; 409 `UPLOAD_INCOMPLETE` e 422 `FILE_TOO_LARGE` pass-through; sem sessão → 401 | `app/api/videos/[publicId]/upload-completion/__tests__/route.integration.test.ts` |
+| `app/api/videos/[publicId]/upload-completion/route.ts` | Integration (MSW) per testing-guide-next-frontend § "Route handler" — 200 com `processingStatus: "uploaded"`; 409 `UPLOAD_INCOMPLETE` e 422 `FILE_TOO_LARGE` pass-through; sem sessão → 401 | `app/api/videos/[publicId]/upload-completion/__tests__/route.integration.test.ts` |
 
 **Dependencies:** SI-03.17, SI-03.18
 
 **Acceptance criteria:**
 
-- `POST /api/videos/{publicId}/upload-completion` com sessão do dono retorna `200` com o `VideoResponse` em `processing_status: "uploaded"`.
+- `POST /api/videos/{publicId}/upload-completion` com sessão do dono retorna `200` com o `VideoResponse` em `processingStatus: "uploaded"`.
 - Respostas `409 UPLOAD_INCOMPLETE`, `409 INVALID_VIDEO_STATE` e `422 FILE_TOO_LARGE` do upstream chegam ao browser com o mesmo status e envelope.
 - Sem sessão, retorna `401` com `error: "UNAUTHORIZED"`.
 
@@ -910,7 +910,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 **Technical actions:**
 
-1. Criar `hooks/use-video-status.ts` (`"use client"`) — `useVideoStatus(publicId, initialVideo)` → `{ video, setVideo }`: enquanto `video.processing_status ∈ {"uploaded", "processing"}`, encadeia `setTimeout(~3000)` + `fetch("/api/videos/{publicId}")`, agendando a próxima requisição só depois que a anterior termina (sem requisições sobrepostas); para em `ready`/`failed`; limpa o timer no unmount; sem SWR/TanStack (per `phase-03-videos/TD-11` e revisão 2026-10-06).
+1. Criar `hooks/use-video-status.ts` (`"use client"`) — `useVideoStatus(publicId, initialVideo)` → `{ video, setVideo }`: enquanto `video.processingStatus ∈ {"uploaded", "processing"}`, encadeia `setTimeout(~3000)` + `fetch("/api/videos/{publicId}")`, agendando a próxima requisição só depois que a anterior termina (sem requisições sobrepostas); para em `ready`/`failed`; limpa o timer no unmount; sem SWR/TanStack (per `phase-03-videos/TD-11` e revisão 2026-10-06).
 2. `setVideo` permite injetar o `VideoResponse` devolvido pelo `upload-completion`, o que (re)inicia o polling; `401` interrompe o polling e redireciona para `/login` (per `### UI Contracts` → Error Catalog → UX mapping).
 
 **Tests:**
@@ -951,7 +951,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 - `formatDuration(941000)` retorna `"15:41"` e `formatDuration(3723000)` retorna `"1:02:03"`.
 - `qualityLabel(1920, 1080)` e `qualityLabel(1080, 1920)` retornam o mesmo rótulo.
-- Todo valor de `processing_status` e de `failureReason` do contrato tem uma copy não vazia (checado contra o tipo derivado do contrato).
+- Todo valor de `processingStatus` e de `failureReason` do contrato tem uma copy não vazia (checado contra o tipo derivado do contrato).
 
 ---
 
@@ -1226,7 +1226,7 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
 **Technical actions:**
 
-1. **Rendering strategy** — mesma página RSC e `video-studio-view.tsx` de SI-03.30b; a variante `ready` é escolhida por `processing_status === "ready"`, seja no carregamento inicial, seja quando o polling chega a `ready` (per UI Contract `**Rendering strategy:**`; per `phase-03-videos/TD-11`).
+1. **Rendering strategy** — mesma página RSC e `video-studio-view.tsx` de SI-03.30b; a variante `ready` é escolhida por `processingStatus === "ready"`, seja no carregamento inicial, seja quando o polling chega a `ready` (per UI Contract `**Rendering strategy:**`; per `phase-03-videos/TD-11`).
 2. **Endpoint wiring — mídia** — ao entrar em `ready`, `fetch("/api/videos/{publicId}/media-urls")` uma vez, tipado por `MediaUrlsResponse`; `VideoPlayer` recebe `src = streamUrl` e `poster = thumbnailUrl` (`<video controls>` nativo, OQ-8); DownloadButton recebe `href = downloadUrl` e fica desabilitado até as URLs chegarem (per `### API Contracts` → BFF tier `#### GET /api/videos/{publicId}/media-urls`; per `phase-03-videos/TD-08`, `phase-03-videos/TD-09`).
 3. **Dados exibidos** — ThumbUpload com `thumbnailUrl`; duração via `formatDuration(durationMs)` e qualidade via `qualityLabel(width, height)`; filename original; ProcessingStatus com `processingStatusCopy("ready")` (per `video-metadata/TD-03`, `video-metadata/TD-05`).
 4. **Error mapping** — falha ou `409 VIDEO_NOT_READY` ao buscar as URLs → player sem `src` com mensagem curta e DownloadButton desabilitado; `UNAUTHORIZED` → redirect `/login` (per UI Contract `**Error Catalog → UX mapping:**`).
@@ -1258,7 +1258,7 @@ E2E da página (reprodução com `src` pré-assinado, download, estado `ready` v
 
 #### Video
 
-Tabela `videos` (`@Entity('videos')`). Identificadores de domínio copiados verbatim dos TDs: `public_id` (phase-03-videos/TD-07), `processing_status` / `publication_status` (phase-03-videos/TD-06), `failureReason` → coluna `failure_reason` (video-metadata/TD-04), `durationMs` / `width` / `height` / `sizeBytes` → colunas `duration_ms` / `width` / `height` / `size_bytes` (video-metadata/TD-03). Colunas seguem o padrão snake_case das entidades existentes (`is_confirmed`, `user_id`); o casing do wire é definido em §API Contracts.
+Tabela `videos` (`@Entity('videos')`). Identificadores de domínio copiados verbatim dos TDs: `public_id` (phase-03-videos/TD-07), `processing_status` / `publication_status` (phase-03-videos/TD-06), `failureReason` → coluna `failure_reason` (video-metadata/TD-04), `durationMs` / `width` / `height` / `sizeBytes` → colunas `duration_ms` / `width` / `height` / `size_bytes` (video-metadata/TD-03). Colunas seguem o padrão snake_case das entidades existentes (`is_confirmed`, `user_id`); no wire, `processing_status`/`publication_status` viram `processingStatus`/`publicationStatus` (phase-03-videos/TD-06, revisão 2026-10-08) — ver §API Contracts.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
@@ -1294,15 +1294,15 @@ Layout derivado de forma determinística do `public_id` por um único helper do 
 
 ### API Contracts
 
-> _Backend tier — `nestjs-project`. Novo `VideosController` (`@ApiTags('videos')`, `@Controller('videos')`), todas as rotas autenticadas (guard JWT global — nenhuma `@Public()`) com `@ApiBearerAuth('access-token')`, e `@SkipThrottle()` no controller: o `ThrottlerGuard` global (10 req/min, phase-02-auth/TD-08) bloquearia a assinatura de partes, já que um arquivo de 10GB gera milhares de requests `upload-signatures`. Erros usam o envelope compartilhado `ApiErrorEnvelope` (phase-02-auth/TD-07). Casing dos campos do wire é verbatim dos TDs (`publicId`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes` em camelCase; `processing_status`, `publication_status` em snake_case) — a divergência de casing entre TDs é preservada de propósito (invariante F2)._
+> _Backend tier — `nestjs-project`. Novo `VideosController` (`@ApiTags('videos')`, `@Controller('videos')`), todas as rotas autenticadas (guard JWT global — nenhuma `@Public()`) com `@ApiBearerAuth('access-token')`, e `@SkipThrottle()` no controller: o `ThrottlerGuard` global (10 req/min, phase-02-auth/TD-08) bloquearia a assinatura de partes, já que um arquivo de 10GB gera milhares de requests `upload-signatures`. Erros usam o envelope compartilhado `ApiErrorEnvelope` (phase-02-auth/TD-07). Todos os campos do wire são camelCase — `publicId`, `processingStatus`, `publicationStatus`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes` (phase-03-videos/TD-06, revisão 2026-10-08); colunas do banco (`processing_status`, `publication_status`) e valores de enum (`awaiting_upload`, `draft`, …) seguem em snake_case._
 
 #### Shared response shape — `VideoResponseDto`
 
 - publicId: string — 11 caracteres base64url (phase-03-videos/TD-07)
 - filename: string — nome original do arquivo capturado no pré-cadastro
-- processing_status: `"awaiting_upload" | "uploaded" | "processing" | "ready" | "failed"` (phase-03-videos/TD-06)
-- publication_status: `"draft" | "published"` — sempre `"draft"` na Fase 03 (phase-03-videos/TD-06)
-- failureReason: `"not_a_video" | "unreadable_file" | "unsupported_media" | "processing_error" | "upload_abandoned"` | null — não-nulo só quando `processing_status = "failed"` (video-metadata/TD-04)
+- processingStatus: `"awaiting_upload" | "uploaded" | "processing" | "ready" | "failed"` (phase-03-videos/TD-06)
+- publicationStatus: `"draft" | "published"` — sempre `"draft"` na Fase 03 (phase-03-videos/TD-06)
+- failureReason: `"not_a_video" | "unreadable_file" | "unsupported_media" | "processing_error" | "upload_abandoned"` | null — não-nulo só quando `processingStatus = "failed"` (video-metadata/TD-04)
 - durationMs: integer | null — milissegundos inteiros (video-metadata/TD-03)
 - width: integer | null — largura de exibição, rotação aplicada (video-metadata/TD-03)
 - height: integer | null — altura de exibição, rotação aplicada (video-metadata/TD-03)
@@ -1316,7 +1316,7 @@ Os metadados (`durationMs`, `width`, `height`, `sizeBytes`) ficam `null` até o 
 
 #### POST /videos (SI-03.6)
 
-Pré-cadastra o vídeo como rascunho (`processing_status: awaiting_upload`, `publication_status: draft`) no canal do usuário autenticado e gera o `public_id`.
+Pré-cadastra o vídeo como rascunho (`processingStatus: awaiting_upload`, `publicationStatus: draft`) no canal do usuário autenticado e gera o `public_id`.
 
 **Request headers:**
 - Authorization: Bearer {access_token}
@@ -1355,7 +1355,7 @@ Lê o vídeo do dono. Consumido pelo RSC de `/studio/videos/[publicId]` e pelo p
 
 #### POST /videos/{publicId}/upload-signatures (SI-03.8)
 
-Assina uma operação S3 do upload multipart — é o alvo do `signRequest` do Uppy (phase-03-videos/TD-04, phase-03-videos/TD-05). A API só pré-assina URLs com o client S3 configurado com `S3_PUBLIC_ENDPOINT` (assinatura offline, phase-03-videos/TD-01); os bytes vão do browser direto ao storage. Permitido só enquanto `processing_status = awaiting_upload` (phase-03-videos/TD-06, revisão 2026-10-07). A key do objeto é sempre a do servidor: `videos/{publicId}/original`.
+Assina uma operação S3 do upload multipart — é o alvo do `signRequest` do Uppy (phase-03-videos/TD-04, phase-03-videos/TD-05). A API só pré-assina URLs com o client S3 configurado com `S3_PUBLIC_ENDPOINT` (assinatura offline, phase-03-videos/TD-01); os bytes vão do browser direto ao storage. Permitido só enquanto `processingStatus = awaiting_upload` (phase-03-videos/TD-06, revisão 2026-10-07). A key do objeto é sempre a do servidor: `videos/{publicId}/original`.
 
 **Request headers:**
 - Authorization: Bearer {access_token}
@@ -1390,7 +1390,7 @@ Mapeamento (tabela do `signRequest` no Uppy 6):
 - 400 INVALID_UPLOAD_KEY: operação com `uploadId` cuja `key` difere de `videos/{publicId}/original`
 - 400 UNSUPPORTED_UPLOAD_OPERATION: combinação fora da tabela (ex.: `PUT` sem `uploadId`, `partNumber` sem `uploadId`)
 - 404 VIDEO_NOT_FOUND: vídeo inexistente ou de outro canal
-- 409 INVALID_VIDEO_STATE: `processing_status` diferente de `awaiting_upload`
+- 409 INVALID_VIDEO_STATE: `processingStatus` diferente de `awaiting_upload`
 - 401 Unauthorized: access token ausente ou inválido
 
 ---
@@ -1407,12 +1407,12 @@ Ação de transição de estado (`@HttpCode(200)`): confirma o objeto enviado e 
 
 **Request body:** none
 
-**Response 200:** `VideoResponseDto` (normalmente com `processing_status: "uploaded"`)
+**Response 200:** `VideoResponseDto` (normalmente com `processingStatus: "uploaded"`)
 
 **Error responses:**
 - 404 VIDEO_NOT_FOUND: vídeo inexistente ou de outro canal
 - 409 UPLOAD_INCOMPLETE: `HeadObject` não encontra o objeto original (multipart não concluído)
-- 409 INVALID_VIDEO_STATE: `processing_status = failed` (terminal — phase-03-videos/TD-06, revisão 2026-10-07)
+- 409 INVALID_VIDEO_STATE: `processingStatus = failed` (terminal — phase-03-videos/TD-06, revisão 2026-10-07)
 - 422 FILE_TOO_LARGE: `ContentLength` do objeto acima de 10 GiB — o objeto é apagado e o vídeo permanece em `awaiting_upload`
 - 401 Unauthorized: access token ausente ou inválido
 
@@ -1435,7 +1435,7 @@ Emite as URLs pré-assinadas de entrega do MP4 normalizado (phase-03-videos/TD-0
 
 **Error responses:**
 - 404 VIDEO_NOT_FOUND: vídeo inexistente ou de outro canal
-- 409 VIDEO_NOT_READY: `processing_status` diferente de `ready`
+- 409 VIDEO_NOT_READY: `processingStatus` diferente de `ready`
 - 401 Unauthorized: access token ausente ou inválido
 
 ---
@@ -1471,7 +1471,7 @@ Emite as URLs pré-assinadas de entrega do MP4 normalizado (phase-03-videos/TD-0
 - 404 VIDEO_NOT_FOUND: pass-through *(derived: project contract source)*
 - 401 UNAUTHORIZED: sessão ausente ou refresh falhou *(per phase-02-auth-frontend/TD-03)*
 
-Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `processing_status ∈ {uploaded, processing}`) *(per phase-03-videos/TD-11)*.
+Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `processingStatus ∈ {uploaded, processing}`) *(per phase-03-videos/TD-11)*.
 
 ---
 
@@ -1559,8 +1559,8 @@ Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `pro
 | errorCode | HTTP | Message | Trigger |
 |-----------|------|---------|---------|
 | VIDEO_NOT_FOUND | 404 | Video not found | `publicId` inexistente, com formato inválido ou de outro canal — em qualquer rota `/videos/{publicId}/**` |
-| INVALID_VIDEO_STATE | 409 | Operation not allowed in the current processing status | `upload-signatures` com `processing_status ≠ awaiting_upload`; `upload-completion` com `processing_status = failed` (terminal, phase-03-videos/TD-06) |
-| VIDEO_NOT_READY | 409 | Video is not ready | `media-urls` com `processing_status ≠ ready` |
+| INVALID_VIDEO_STATE | 409 | Operation not allowed in the current processing status | `upload-signatures` com `processingStatus ≠ awaiting_upload`; `upload-completion` com `processingStatus = failed` (terminal, phase-03-videos/TD-06) |
+| VIDEO_NOT_READY | 409 | Video is not ready | `media-urls` com `processingStatus ≠ ready` |
 | INVALID_UPLOAD_KEY | 400 | Upload key does not belong to this video | `upload-signatures` com `uploadId` e `key` ≠ `videos/{publicId}/original` |
 | UNSUPPORTED_UPLOAD_OPERATION | 400 | Unsupported upload operation | `upload-signatures` com combinação fora da tabela do `signRequest` (ex.: `PUT` sem `uploadId`) |
 | UPLOAD_INCOMPLETE | 409 | Uploaded file not found | `upload-completion` quando `HeadObject` não encontra o objeto original |
@@ -1568,7 +1568,7 @@ Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `pro
 | VALIDATION_ERROR | 400 | _array de erros por campo_ | Falha de class-validator em qualquer body (herdado de phase-02-auth) |
 | UNAUTHORIZED | 401 | Session expired | Só no BFF: sessão ausente ou refresh falhou (phase-02-auth-frontend/TD-03). No upstream, o guard JWT responde 401 padrão do Nest |
 
-**Processing failure reasons** — não são erros HTTP; são valores de `failureReason` no `VideoResponseDto` quando `processing_status = failed` (video-metadata/TD-04). O frontend mapeia cada código para copy.
+**Processing failure reasons** — não são erros HTTP; são valores de `failureReason` no `VideoResponseDto` quando `processingStatus = failed` (video-metadata/TD-04). O frontend mapeia cada código para copy.
 
 | failureReason | Set by | Trigger |
 |---------------|--------|---------|
@@ -1693,7 +1693,7 @@ Não há evento push para o frontend: o status chega por short polling de `GET /
 
 **Auth requirement:** Authenticated+Owner _(source: §Authorization Matrix — `GET /api/videos/{publicId}`, `POST /api/videos/{publicId}/upload-signatures`, `POST /api/videos/{publicId}/upload-completion`)_
 
-**Rendering strategy:** página RSC assíncrona — lê o vídeo no upstream server-side com o token da sessão (`notFound()` em 404 VIDEO_NOT_FOUND) e entrega o `VideoResponseDto` inicial a Client Components; o progresso vem do provider Uppy do layout e o status do hook de polling hand-rolled _(source: phase-02-auth-frontend/TD-06; phase-03-videos/TD-05; phase-03-videos/TD-11)_. As duas telas inventariadas para esta rota são estados da mesma página, escolhidos por `processing_status` + presença de upload ativo no provider.
+**Rendering strategy:** página RSC assíncrona — lê o vídeo no upstream server-side com o token da sessão (`notFound()` em 404 VIDEO_NOT_FOUND) e entrega o `VideoResponseDto` inicial a Client Components; o progresso vem do provider Uppy do layout e o status do hook de polling hand-rolled _(source: phase-02-auth-frontend/TD-06; phase-03-videos/TD-05; phase-03-videos/TD-11)_. As duas telas inventariadas para esta rota são estados da mesma página, escolhidos por `processingStatus` + presença de upload ativo no provider.
 
 **Reused DS components:**
 - `components/layout/side-nav.tsx (new)` — SideNav — see screen: Tela de upload de vídeo
@@ -1727,7 +1727,7 @@ Não há evento push para o frontend: o status chega por short polling de `GET /
 *Interactions:*
 - `upload-progress` do Uppy → atualiza percentual e `ProgressLinear` do `UploadProgressPanel`
 - `upload-success` do Uppy → `POST /api/videos/{publicId}/upload-completion` → o `VideoResponseDto` retornado (`uploaded`) alimenta o hook de status, que passa a fazer polling
-- Polling (~3s, sem requests sobrepostos) enquanto `processing_status ∈ {uploaded, processing}`; para em `ready`/`failed` (phase-03-videos/TD-11)
+- Polling (~3s, sem requests sobrepostos) enquanto `processingStatus ∈ {uploaded, processing}`; para em `ready`/`failed` (phase-03-videos/TD-11)
 - `ready` → a página troca para o estado "upload concluído" (screen seguinte) sem reload
 - `CopyLinkButton` click → copia a URL do VideoLink para o clipboard
 - Seletor do estado "Envio interrompido" → provider inicia o upload do novo arquivo para o mesmo `publicId`

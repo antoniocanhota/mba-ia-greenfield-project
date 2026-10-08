@@ -3,7 +3,7 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-07T15:18:52-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-08T08:04:12-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
@@ -60,9 +60,9 @@ sources_mtime:
 | phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
 | phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | decided | A (presigned S3 multipart) | — |
 |     └─ Last revision: 2026-10-07 — This replaces the "aborted best-effort via `signRequest`" clause in the… | | | | | | |
-| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | A (Uppy 6 headless) | @uppy/core, @uppy/aws-s3 |
+| phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | Option A (Uppy 6 headless) | @uppy/core, @uppy/aws-s3 |
 | phase-03-videos/TD-06 | phase | Cross-layer | Video Lifecycle Status Model | decided | B (Two orthogonal fields) | — |
-|     └─ Last revision: 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of… | | | | | | |
+|     └─ Last revision: 2026-10-08 — Wire-format (API/OpenAPI) field names are camelCase: `processingStatus` and… | | | | | | |
 | phase-03-videos/TD-07 | phase | Cross-layer | Public Video Identifier for Unique URLs | decided | B (Random 11-char base64url) | — |
 | phase-03-videos/TD-08 | phase | Cross-layer | Playback Format and Processing Scope | decided | A (Normalize to a single progressive MP4) | — |
 |     └─ Last revision: 2026-10-07 — The original upload object is deleted as soon as processing reaches a terminal… | | | | | | |
@@ -73,8 +73,8 @@ sources_mtime:
 |     └─ Last revision: 2026-10-06 — Client mechanism pinned: hand-rolled hook (setTimeout chain + fetch to the… | | | | | | |
 | video-metadata/TD-01 | ad-hoc | Cross-layer | Metadata Set and Persistence Shape | decided | A (Minimal typed fields only) | — |
 |     └─ Last revision: 2026-10-07 — No raw-probe column is persisted: the Recommendation's internal `jsonb` probe… | | | | | | |
-| video-metadata/TD-02 | ad-hoc | Cross-layer | Metadata Extraction Timing and Source of Truth | decided | C (Two-stage — provisional from original, authoritative from output) | — |
-| video-metadata/TD-03 | ad-hoc | Cross-layer | Metadata Value Contract (duration unit, display dimensions… | decided | A (Raw numeric fields; frontend derives labels) | — |
+| video-metadata/TD-02 | ad-hoc | Cross-layer | Metadata Extraction Timing and Source of Truth | decided | C (Two-stage — provisional from the original, authoritative from the output) | — |
+| video-metadata/TD-03 | ad-hoc | Cross-layer | Metadata Value Contract (duration unit, display dimensions… | decided | A (Raw numeric fields; the frontend derives labels) | — |
 | video-metadata/TD-04 | ad-hoc | Cross-layer | Processing Failure Reason Contract | decided | B (Machine-readable `failureReason` enum) | — |
 |     └─ Last revision: 2026-10-07 — Adds the `upload_abandoned` code, set by the abandoned-upload sweep from the… | | | | | | |
 | video-metadata/TD-05 | ad-hoc | Frontend | Metadata Shown While the Upload Is Still Running | decided | A (Server values only; placeholders until the probe runs) | — |
@@ -140,6 +140,7 @@ _Source files:_
 
 **Revisions:**
 - 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of `failed`, whatever the `failureReason` (including `upload_abandoned`), so no file can be re-attached to a failed draft. Re-uploading means creating a new draft from `/studio/upload`. The failed draft keeps its `publicId` and stays until Phase 04 adds video management. On `/studio/videos/[publicId]` the `failed` state shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching to the same draft (the "Envio interrompido" state) is allowed only while `processing_status = awaiting_upload`. _Rationale:_ failed is terminal. This is consistent with the `TD-08` revision ("a failed video is re-uploaded rather than reprocessed") (resolves AMB-4 of phase-03 validation).
+- 2026-10-08 — Wire-format (API/OpenAPI) field names are camelCase: `processingStatus` and `publicationStatus`. Enum values (`awaiting_upload`, `uploaded`, `processing`, `ready`, `failed`, `draft`, `published`) and DB columns (`processing_status`, `publication_status`) are unchanged. _Rationale:_ Aligns the video contract with the other camelCase wire fields (`publicId`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes`); the snake_case names in this TD's prose describe the domain model/DB columns, not the HTTP contract.
 
 ### phase-03-videos/TD-07
 

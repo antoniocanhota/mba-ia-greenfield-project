@@ -219,6 +219,7 @@ _Subprojects in scope:_
 **Revisions:**
 
 - 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of `failed`, whatever the `failureReason` (including `upload_abandoned`), so no file can be re-attached to a failed draft. Re-uploading means creating a new draft from `/studio/upload`. The failed draft keeps its `publicId` and stays until Phase 04 adds video management. On `/studio/videos/[publicId]` the `failed` state shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching to the same draft (the "Envio interrompido" state) is allowed only while `processing_status = awaiting_upload`. _Rationale:_ failed is terminal. This is consistent with the `TD-08` revision ("a failed video is re-uploaded rather than reprocessed") (resolves AMB-4 of phase-03 validation).
+- 2026-10-08 — Wire-format (API/OpenAPI) field names are camelCase: `processingStatus` and `publicationStatus`. Enum values (`awaiting_upload`, `uploaded`, `processing`, `ready`, `failed`, `draft`, `published`) and DB columns (`processing_status`, `publication_status`) are unchanged. _Rationale:_ Aligns the video contract with the other camelCase wire fields (`publicId`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes`); the snake_case names in this TD's prose describe the domain model/DB columns, not the HTTP contract.
 
 ---
 
