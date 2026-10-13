@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 4/44 completed
+**SIs:** 5/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -31,9 +31,13 @@
   - `npm run lint` mostra 1 warning pré-existente em `components/auth/signup-form.tsx` (React Hook Form `watch`); fora de escopo.
 
 ### SI-03.0.5 — Custom-business simple group: copy-link-button + processing-status + thumb-upload + upload-dropzone + upload-progress-panel
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 18 passing
+- **Observations:**
+  - `processing-status.tsx` define localmente a união de `processingStatus` (`ProcessingStatusValue`) porque `lib/api/contracts.ts` só ganha `VideoProcessingStatus` em SI-03.16; trocar pelo tipo do contrato depois.
+  - `thumb-upload.tsx` usa `<img>` (com `eslint-disable @next/next/no-img-element`) em vez de `next/image`, por ser URL public-read do storage (TD-09) fora de `remotePatterns`.
+  - `upload-progress-panel.tsx` arredonda e limita o percentual a 0–100 antes de renderizar texto e barra, garantindo que os dois nunca divergem.
+  - Ícones de copiar (inline no `copy-link-button.tsx`) e spinners (CSS) foram feitos sem fetch do Figma; o audit dos screens pode ajustar.
 
 ### SI-03.0.6 — Custom-business simple group: video-details-card + video-player + video-status-badge
 - **Status:** pending
