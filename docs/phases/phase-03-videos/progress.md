@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 2/44 completed
+**SIs:** 3/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -18,8 +18,8 @@
   - O testing-guide-next-frontend § "UI Primitives" diz para não testar primitives shadcn; o plano exige este teste explicitamente (precedentes: `checkbox.test.tsx`, `icon-button.test.tsx`). Seguido o plano.
 
 ### SI-03.0.3 — Custom-ui: section-header.tsx
-- **Status:** pending
-- **Tests:** —
+- **Status:** completed
+- **Tests:** 4 passing
 - **Observations:** none
 
 ### SI-03.0.4 — Custom-business simple group: download-icon + upload-icon + video-file-icon + side-nav-item + side-nav
