@@ -12,6 +12,10 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      storage:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:17
@@ -33,4 +37,34 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # S3-compatible object storage. TD-01 chose MinIO, but `minio/minio` no longer
+  # pulls (archived), so RustFS — the TD's drop-in fallback — runs here instead.
+  storage:
+    image: rustfs/rustfs:1.0.1
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - RUSTFS_ACCESS_KEY=streamtube
+      - RUSTFS_SECRET_KEY=streamtube-secret
+      - RUSTFS_CORS_ALLOWED_ORIGINS=http://localhost:3001
+    volumes:
+      - storage_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
+  redis:
+    image: redis:8.2-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  storage_data:
