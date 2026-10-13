@@ -4,9 +4,10 @@ name: phase-03-videos
 status: clean
 issue_count: 0
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-08T08:08:31-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-13T14:12:07-03:00"
   docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-08T08:04:12-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
+  docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:11:00-03:00"
 issues:
   - id: IC-1
     status: resolved
@@ -108,6 +109,10 @@ issues:
     status: resolved
     summary: "TD-04: how to abort the old multipart after reload when uploadId isn't persisted"
     resolved_by: phase-03-videos/TD-04
+  - id: ICC-1
+    status: resolved
+    summary: "e2e-video-upload-fixtures/TD-02 server-generated publicIds vs deterministic MSW fixtures"
+    resolved_by: e2e-video-upload-fixtures/TD-02
 advisories: []
 ---
 
@@ -170,3 +175,4 @@ _None._
 - **AMB-3** _(resolved_by phase-03-videos/TD-04)_ — Re-attach after reload: resume the existing multipart upload or restart it? Revision 2026-10-07 on TD-04: resume is limited to the browser session. Re-attaching a file after a reload starts a new multipart upload for the draft's object key, the old one is aborted best-effort, and the 1-day lifecycle rule is the backstop. `uploadId` is not persisted and there is no list-parts BFF read.
 - **AMB-4** _(resolved_by phase-03-videos/TD-06)_ — Can a file be re-attached to a draft the sweep marked failed (upload_abandoned)? Revision 2026-10-07 on TD-06: `failed` is terminal for every `failureReason`. Re-uploading creates a new draft from `/studio/upload`, the failed draft remains until Phase 04, and its page shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching is allowed only while `processing_status = awaiting_upload`.
 - **AMB-5** _(resolved_by phase-03-videos/TD-04)_ — TD-04: how to abort the old multipart after reload when uploadId isn't persisted. Third 2026-10-07 revision on TD-04 replaces the unexecutable "best-effort via `signRequest`" clause. When the API signs a `CreateMultipartUpload` for a draft's key, it first calls `ListMultipartUploads` (Prefix = key) and aborts every in-progress upload. This is server-side only, with no `uploadId` persisted, and the lifecycle rule stays as the backstop.
+- **ICC-1** _(resolved_by e2e-video-upload-fixtures/TD-02)_ — e2e-video-upload-fixtures/TD-02 server-generated publicIds vs deterministic MSW fixtures. Revision 2026-10-13 on TD-02 (Option A kept): the in-memory store generates `publicId`s from a module-level counter (`vid` + zero-padded number, 11 chars), reset by `resetVideoStore()` in `mocks/setup.ts` `afterEach`. Vitest tests see a fixed ID sequence and can assert exact values; E2E workers share one Next.js process, so IDs stay unique. The "must not assume a fixed `publicId`" clause is replaced.
