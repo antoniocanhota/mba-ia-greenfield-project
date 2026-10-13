@@ -5,7 +5,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { randomBytes } from 'crypto';
-import { request as httpRequest } from 'http';
+import { request as httpRequest, type IncomingHttpHeaders } from 'http';
 import storageConfig from '../config/storage.config';
 
 export type StorageTestConfig = ReturnType<typeof storageConfig>;
@@ -48,6 +48,7 @@ export async function deleteTestBucket(
 export interface InternalFetchResult {
   status: number;
   text: string;
+  headers: IncomingHttpHeaders;
 }
 
 // The public endpoint (localhost:9000) only resolves from the host machine. Inside the
@@ -56,7 +57,7 @@ export interface InternalFetchResult {
 export function fetchViaInternalEndpoint(
   url: string,
   config: StorageTestConfig,
-  init: { method?: string; body?: Buffer } = {},
+  init: { method?: string; body?: Buffer | string } = {},
 ): Promise<InternalFetchResult> {
   const publicUrl = new URL(url);
   const internal = new URL(config.endpoint as string);
@@ -67,7 +68,13 @@ export function fetchViaInternalEndpoint(
         port: internal.port,
         path: `${publicUrl.pathname}${publicUrl.search}`,
         method: init.method ?? 'GET',
-        headers: { host: publicUrl.host },
+        headers: {
+          host: publicUrl.host,
+          // S3 rejects chunked uploads; UploadPart needs an explicit length.
+          ...(init.body !== undefined && {
+            'content-length': Buffer.byteLength(init.body),
+          }),
+        },
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -76,6 +83,7 @@ export function fetchViaInternalEndpoint(
           resolve({
             status: res.statusCode as number,
             text: Buffer.concat(chunks).toString(),
+            headers: res.headers,
           }),
         );
       },

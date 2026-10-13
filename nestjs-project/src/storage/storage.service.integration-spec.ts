@@ -80,6 +80,17 @@ describe('StorageService (integration, real storage)', () => {
     expect(new URL(url).host).not.toBe(new URL(config.endpoint!).host);
   });
 
+  it('should not bake a checksum of an empty body into presigned upload URLs', async () => {
+    const url = await service.presign(
+      new PutObjectCommand({ Bucket: config.bucket, Key: 'checksum-probe' }),
+      60,
+    );
+
+    const params = new URL(url).searchParams;
+    expect(params.has('x-amz-checksum-crc32')).toBe(false);
+    expect(params.has('x-amz-sdk-checksum-algorithm')).toBe(false);
+  });
+
   it('should presign a GET that downloads the object', async () => {
     const key = originalKey('getTest0001');
     await client.send(

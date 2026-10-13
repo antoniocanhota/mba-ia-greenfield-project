@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -20,7 +21,10 @@ import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { SignUploadRequestDto } from './dto/sign-upload-request.dto';
+import { SignUploadResponseDto } from './dto/sign-upload-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
+import { UploadSigningService } from './upload-signing.service';
 import { VideosService } from './videos.service';
 
 // The global ThrottlerGuard (10 req/min) would block part signing for large uploads,
@@ -29,7 +33,10 @@ import { VideosService } from './videos.service';
 @ApiTags('videos')
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly videosService: VideosService) {}
+  constructor(
+    private readonly videosService: VideosService,
+    private readonly uploadSigningService: UploadSigningService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -98,5 +105,57 @@ export class VideosController {
       publicId,
     );
     return this.videosService.toResponse(video);
+  }
+
+  @Post(':publicId/upload-signatures')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Sign an S3 multipart upload operation',
+    description:
+      'Target of the Uppy signRequest: presigns one S3 multipart operation for the video original. Only allowed while the video is awaiting upload.',
+  })
+  @ApiParam({
+    name: 'publicId',
+    description: '11-character base64url public id of the video',
+    example: 'dQw4w9WgXcQ',
+  })
+  @ApiBody({ type: SignUploadRequestDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Presigned URL for the requested operation',
+    type: SignUploadResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validation failed, upload key mismatch or unsupported operation',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found (or not owned by the user)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video is not awaiting upload',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async signUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('publicId') publicId: string,
+    @Body() dto: SignUploadRequestDto,
+  ): Promise<SignUploadResponseDto> {
+    const video = await this.videosService.findOwnedByPublicId(
+      user.sub,
+      publicId,
+    );
+    return this.uploadSigningService.sign(video, dto);
   }
 }

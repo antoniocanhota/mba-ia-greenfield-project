@@ -4,6 +4,7 @@ import { ChannelsModule } from '../channels/channels.module';
 import { QueueModule } from '../queue/queue.module';
 import { StorageModule } from '../storage/storage.module';
 import { Video } from './entities/video.entity';
+import { UploadSigningService } from './upload-signing.service';
 import { VideosController } from './videos.controller';
 import { VideosService } from './videos.service';
 
@@ -15,7 +16,7 @@ import { VideosService } from './videos.service';
     StorageModule,
   ],
   controllers: [VideosController],
-  providers: [VideosService],
+  providers: [VideosService, UploadSigningService],
   exports: [TypeOrmModule, VideosService],
 })
 export class VideosModule {}

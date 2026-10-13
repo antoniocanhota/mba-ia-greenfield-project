@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 13/44 completed
+**SIs:** 14/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -121,9 +121,15 @@
   - `:publicId` é lido sem pipe de validação, de propósito: formato inválido deve virar 404 `VIDEO_NOT_FOUND` (e não 400).
 
 ### SI-03.8 — Endpoint POST /videos/{publicId}/upload-signatures
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 24 new unit/integration passing (`upload-signing.service.spec.ts` 20, `upload-signing.service.integration-spec.ts` 3, +1 em `storage.service.integration-spec.ts`) + `videos-upload-signatures.e2e-spec.ts` 7 passing (spec-derived, `nestjs-project/specs/videos-upload-signatures.plan.md`); suite unit/integration 236 passing; e2e 68 passing (duas rodadas seguidas); `tsc --noEmit` exit 0
+- **Observations:**
+  - **Bug do SI-03.3 corrigido:** o client signer (`S3_SIGNER_CLIENT`) usava o `requestChecksumCalculation` padrão do AWS SDK v3, que embute na URL pré-assinada o CRC32 de um corpo vazio (`x-amz-checksum-crc32`); qualquer `UploadPart` real do browser falharia com `BadDigest` (RustFS respondeu 400). O client signer agora usa `requestChecksumCalculation: 'WHEN_REQUIRED'`. Descoberto pelo teste de integração (URLs executadas de verdade) e travado por testes em `storage.service.integration-spec.ts` e `upload-signing.service.integration-spec.ts`.
+  - A checagem de estado (`INVALID_VIDEO_STATE`) fica no `UploadSigningService.sign`, não no controller, para manter a regra de negócio no service (o plano a descreve no controller). Ordem de erros: 404 (ownership) → 409 (estado) → 400 (key/operação).
+  - Com `uploadId`, a key é validada antes do método (key divergente = `INVALID_UPLOAD_KEY` mesmo para combinação inválida). Sem `uploadId`, só `POST` sem `partNumber` é aceito; o resto (`PUT` sem `uploadId`, `partNumber` sem `uploadId`, `GET`/`DELETE` sem `uploadId`) é `UNSUPPORTED_UPLOAD_OPERATION`.
+  - O `CreateMultipartUpload` só aborta uploads cuja `Key` é exatamente a key do rascunho (o `ListMultipartUploads` filtra por prefixo, então chaves parecidas ficam de fora).
+  - Em testes, executar a URL pré-assinada exige o endpoint interno com o `Host` público; `fetchViaInternalEndpoint` agora também envia `Content-Length` (S3 rejeita upload chunked) e devolve os headers (ETag).
+  - Um `prettier --write src` amplo reformatou por engano dois templates `.hbs`; revertidos antes do fim (nenhuma mudança neles ficou no diff).
 
 ### SI-03.9 — Endpoint POST /videos/{publicId}/upload-completion
 - **Status:** pending
