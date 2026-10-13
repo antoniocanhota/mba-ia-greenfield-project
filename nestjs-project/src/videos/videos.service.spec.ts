@@ -1,9 +1,16 @@
+import { S3ServiceException } from '@aws-sdk/client-s3';
 import { QueryFailedError } from 'typeorm';
 import { ChannelsService } from '../channels/channels.service';
 import { Channel } from '../channels/entities/channel.entity';
 import { StorageService } from '../storage/storage.service';
+import { VideoProcessingStatus } from './entities/video-enums';
 import { Video } from './entities/video.entity';
-import { VideoNotFoundException } from './exceptions/video.exceptions';
+import {
+  FileTooLargeException,
+  InvalidVideoStateException,
+  UploadIncompleteException,
+  VideoNotFoundException,
+} from './exceptions/video.exceptions';
 import * as publicIdUtil from './public-id.util';
 import { VideosService } from './videos.service';
 
@@ -22,7 +29,19 @@ function makeCollisionError(): QueryFailedError {
 
 describe('VideosService', () => {
   let service: VideosService;
-  let repository: { create: jest.Mock; save: jest.Mock; findOne: jest.Mock };
+  let repository: {
+    create: jest.Mock;
+    save: jest.Mock;
+    findOne: jest.Mock;
+    update: jest.Mock;
+    findOneByOrFail: jest.Mock;
+  };
+  let storage: {
+    publicUrl: jest.Mock;
+    headObject: jest.Mock;
+    deleteObject: jest.Mock;
+  };
+  let queue: { add: jest.Mock };
   let channelsService: { findByUserId: jest.Mock };
 
   beforeEach(() => {
@@ -30,7 +49,15 @@ describe('VideosService', () => {
       create: jest.fn((data: Partial<Video>) => data),
       save: jest.fn((data: Partial<Video>) => Promise.resolve(data)),
       findOne: jest.fn(),
+      update: jest.fn(),
+      findOneByOrFail: jest.fn(),
     };
+    storage = {
+      publicUrl: jest.fn(),
+      headObject: jest.fn(),
+      deleteObject: jest.fn().mockResolvedValue(undefined),
+    };
+    queue = { add: jest.fn().mockResolvedValue(undefined) };
     channelsService = {
       findByUserId: jest
         .fn()
@@ -39,7 +66,8 @@ describe('VideosService', () => {
     service = new VideosService(
       repository as never,
       channelsService as unknown as ChannelsService,
-      { publicUrl: jest.fn() } as unknown as StorageService,
+      storage as unknown as StorageService,
+      queue as never,
     );
   });
 
@@ -138,6 +166,178 @@ describe('VideosService', () => {
         service.findOwnedByPublicId('user-id', 'not-valid'),
       ).rejects.toBeInstanceOf(VideoNotFoundException);
       expect(repository.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('completeUpload', () => {
+    const videoIn = (status: VideoProcessingStatus): Video =>
+      Object.assign(new Video(), {
+        id: 'video-uuid',
+        public_id: 'abcDEF12345',
+        processing_status: status,
+      });
+
+    function notFoundError(): S3ServiceException {
+      return new S3ServiceException({
+        name: 'NotFound',
+        $fault: 'client',
+        $metadata: { httpStatusCode: 404 },
+      });
+    }
+
+    it('should transition awaiting_upload to uploaded, store the size and enqueue the job', async () => {
+      const uploaded = videoIn(VideoProcessingStatus.UPLOADED);
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockResolvedValue({ ContentLength: 2048 });
+      repository.update.mockResolvedValue({ affected: 1 });
+      repository.findOneByOrFail.mockResolvedValue(uploaded);
+
+      const result = await service.completeUpload('user-id', 'abcDEF12345');
+
+      expect(storage.headObject).toHaveBeenCalledWith(
+        'videos/abcDEF12345/original',
+      );
+      expect(repository.update).toHaveBeenCalledWith(
+        {
+          id: 'video-uuid',
+          processing_status: VideoProcessingStatus.AWAITING_UPLOAD,
+        },
+        {
+          processing_status: VideoProcessingStatus.UPLOADED,
+          size_bytes: 2048,
+        },
+      );
+      expect(queue.add).toHaveBeenCalledWith(
+        'process-video',
+        { videoId: 'video-uuid' },
+        {
+          jobId: 'video-uuid',
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+        },
+      );
+      expect(result).toBe(uploaded);
+    });
+
+    it.each([
+      VideoProcessingStatus.UPLOADED,
+      VideoProcessingStatus.PROCESSING,
+      VideoProcessingStatus.READY,
+    ])(
+      'should be a no-op returning the current video when %s',
+      async (status) => {
+        const video = videoIn(status);
+        repository.findOne.mockResolvedValue(video);
+
+        await expect(
+          service.completeUpload('user-id', 'abcDEF12345'),
+        ).resolves.toBe(video);
+        expect(storage.headObject).not.toHaveBeenCalled();
+        expect(repository.update).not.toHaveBeenCalled();
+        expect(queue.add).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should reject a failed video with INVALID_VIDEO_STATE', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.FAILED),
+      );
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).rejects.toBeInstanceOf(InvalidVideoStateException);
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should throw UPLOAD_INCOMPLETE when the original is not in storage', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockRejectedValue(notFoundError());
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).rejects.toBeInstanceOf(UploadIncompleteException);
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should rethrow storage errors other than not-found', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      const failure = new Error('storage down');
+      storage.headObject.mockRejectedValue(failure);
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).rejects.toBe(failure);
+    });
+
+    it('should delete the object and throw FILE_TOO_LARGE above 10 GiB', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockResolvedValue({ ContentLength: 10737418241 });
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).rejects.toBeInstanceOf(FileTooLargeException);
+      expect(storage.deleteObject).toHaveBeenCalledWith(
+        'videos/abcDEF12345/original',
+      );
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should accept an object of exactly 10 GiB', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockResolvedValue({ ContentLength: 10737418240 });
+      repository.update.mockResolvedValue({ affected: 1 });
+      repository.findOneByOrFail.mockResolvedValue(
+        videoIn(VideoProcessingStatus.UPLOADED),
+      );
+
+      await service.completeUpload('user-id', 'abcDEF12345');
+
+      expect(storage.deleteObject).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not enqueue when it loses the conditional transition to a concurrent request', async () => {
+      const current = videoIn(VideoProcessingStatus.UPLOADED);
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockResolvedValue({ ContentLength: 10 });
+      repository.update.mockResolvedValue({ affected: 0 });
+      repository.findOneByOrFail.mockResolvedValue(current);
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).resolves.toBe(current);
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should propagate an enqueue failure after the transition (the sweep re-enqueues)', async () => {
+      repository.findOne.mockResolvedValue(
+        videoIn(VideoProcessingStatus.AWAITING_UPLOAD),
+      );
+      storage.headObject.mockResolvedValue({ ContentLength: 10 });
+      repository.update.mockResolvedValue({ affected: 1 });
+      repository.findOneByOrFail.mockResolvedValue(
+        videoIn(VideoProcessingStatus.UPLOADED),
+      );
+      const failure = new Error('redis down');
+      queue.add.mockRejectedValue(failure);
+
+      await expect(
+        service.completeUpload('user-id', 'abcDEF12345'),
+      ).rejects.toBe(failure);
     });
   });
 });

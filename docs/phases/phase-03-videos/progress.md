@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 14/44 completed
+**SIs:** 15/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -132,9 +132,14 @@
   - Um `prettier --write src` amplo reformatou por engano dois templates `.hbs`; revertidos antes do fim (nenhuma mudança neles ficou no diff).
 
 ### SI-03.9 — Endpoint POST /videos/{publicId}/upload-completion
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 18 new unit/integration passing (`videos.service.spec.ts` +11, `videos.service.integration-spec.ts` +7) + `videos-upload-completion.e2e-spec.ts` 6 passing (spec-derived, `nestjs-project/specs/videos-upload-completion.plan.md`); suite unit/integration 254 passing; e2e 74 passing (duas rodadas seguidas); `tsc --noEmit` exit 0
+- **Observations:**
+  - `VideosService` ganhou a `Queue` `videos` (`@InjectQueue`) como 4ª dependência; os construtores manuais nos specs existentes foram ajustados. As opções do job (`attempts: 3`, backoff exponencial de 5 s) ficaram em `PROCESS_VIDEO_JOB_OPTIONS` (`queue.constants.ts`) para o sweep (SI-03.14) reutilizar.
+  - Transição por `UPDATE ... WHERE id AND processing_status = 'awaiting_upload'`; só quem ganha a corrida (`affected = 1`) enfileira. Teste de integração com duas conclusões concorrentes confirma 1 job. Em `uploaded`/`processing`/`ready` devolve o vídeo sem tocar em storage/fila (como o plano manda); `failed` lança `INVALID_VIDEO_STATE`.
+  - Falha no `queue.add` **propaga** (500) em vez de ser engolida: a regra de services do projeto proíbe catch sem rethrow. O vídeo já está em `uploaded` e, como uma nova chamada vira no-op, quem reenfileira é o sweep (SI-03.14), que o plano já prevê para o dual-write.
+  - Os e2e usam o Redis e o bucket de dev (`videos` queue e `S3_BUCKET`) e chamam `queue.obliterate({ force: true })` por cenário, como o spec pede: rodar o e2e com o worker ativo (SI-03.11+) apagaria jobs reais da fila de dev.
+  - Cenário de objeto >10 GiB: `jest.spyOn(storageService, 'headObject')` devolve `ContentLength: 10737418241` sobre o objeto real (equivalente ao `overrideProvider` do spec); `deleteObject` roda de verdade e o teste confirma o 404 no storage.
 
 ### SI-03.10 — Endpoint GET /videos/{publicId}/media-urls
 - **Status:** pending

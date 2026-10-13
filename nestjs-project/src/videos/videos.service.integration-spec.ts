@@ -1,20 +1,40 @@
+import { CreateBucketCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import type { S3Client } from '@aws-sdk/client-s3';
+import { ConfigModule } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
+import { Queue } from 'bullmq';
+import { randomBytes } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { VerificationToken } from '../auth/entities/verification-token.entity';
 import { ChannelsService } from '../channels/channels.service';
 import { Channel } from '../channels/entities/channel.entity';
+import queueConfig from '../config/queue.config';
+import storageConfig from '../config/storage.config';
+import { PROCESS_VIDEO_JOB } from '../queue/queue.constants';
+import { S3_INTERNAL_CLIENT } from '../storage/storage.constants';
+import { StorageModule } from '../storage/storage.module';
 import { StorageService } from '../storage/storage.service';
 import {
   cleanAllTables,
   createTestDataSource,
 } from '../test/create-test-data-source';
+import {
+  buildTestStorageConfig,
+  deleteTestBucket,
+} from '../test/storage-test-config';
 import { User } from '../users/entities/user.entity';
 import {
   VideoProcessingStatus,
   VideoPublicationStatus,
 } from './entities/video-enums';
 import { Video } from './entities/video.entity';
-import { VideoNotFoundException } from './exceptions/video.exceptions';
+import {
+  FileTooLargeException,
+  InvalidVideoStateException,
+  UploadIncompleteException,
+  VideoNotFoundException,
+} from './exceptions/video.exceptions';
 import * as publicIdUtil from './public-id.util';
 import { VideosService } from './videos.service';
 
@@ -26,6 +46,11 @@ const INPUT = {
 };
 
 describe('VideosService (integration)', () => {
+  const bucketConfig = buildTestStorageConfig();
+  let queue: Queue;
+  let s3: S3Client;
+  let storageService: StorageService;
+  let closeStorageModule: () => Promise<void>;
   let dataSource: DataSource;
   let service: VideosService;
   let videoRepository: Repository<Video>;
@@ -50,19 +75,45 @@ describe('VideosService (integration)', () => {
     dataSource = createTestDataSource(ALL_ENTITIES);
     await dataSource.initialize();
     videoRepository = dataSource.getRepository(Video);
+
+    const storageModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, load: [storageConfig] }),
+        StorageModule,
+      ],
+    })
+      .overrideProvider(storageConfig.KEY)
+      .useValue(bucketConfig)
+      .compile();
+    storageService = storageModule.get(StorageService);
+    s3 = storageModule.get<S3Client>(S3_INTERNAL_CLIENT);
+    closeStorageModule = () => storageModule.close();
+    await s3.send(new CreateBucketCommand({ Bucket: bucketConfig.bucket }));
+
+    const { host, port } = queueConfig();
+    queue = new Queue(`videos-test-${randomBytes(4).toString('hex')}`, {
+      connection: { host, port },
+    });
+
     service = new VideosService(
       videoRepository,
       new ChannelsService(dataSource),
-      { publicUrl: (key: string) => `http://public/${key}` } as StorageService,
+      storageService,
+      queue,
     );
   });
 
   afterAll(async () => {
+    await queue.obliterate({ force: true });
+    await queue.close();
+    await deleteTestBucket(bucketConfig);
+    await closeStorageModule();
     await dataSource.destroy();
   });
 
   beforeEach(async () => {
     await cleanAllTables(dataSource);
+    await queue.obliterate({ force: true });
     ({ user: owner, channel: ownerChannel } = await createUserWithChannel(
       'owner@example.com',
       'owner',
@@ -132,6 +183,123 @@ describe('VideosService (integration)', () => {
     it('should throw VideoNotFoundException for an unknown public id', async () => {
       await expect(
         service.findOwnedByPublicId(owner.id, 'ZZZZZZZZZZZ'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+  });
+
+  describe('completeUpload', () => {
+    async function putOriginal(publicId: string, size: number): Promise<void> {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: bucketConfig.bucket,
+          Key: `videos/${publicId}/original`,
+          Body: Buffer.alloc(size, 1),
+        }),
+      );
+    }
+
+    it('should mark the video uploaded, store the size and enqueue one process-video job', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+      await putOriginal(draft.public_id, 2048);
+
+      const result = await service.completeUpload(owner.id, draft.public_id);
+
+      expect(result.processing_status).toBe(VideoProcessingStatus.UPLOADED);
+      expect(result.size_bytes).toBe(2048);
+      const stored = await videoRepository.findOneByOrFail({ id: draft.id });
+      expect(stored.processing_status).toBe(VideoProcessingStatus.UPLOADED);
+      expect(stored.size_bytes).toBe(2048);
+      const jobs = await queue.getJobs();
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].id).toBe(draft.id);
+      expect(jobs[0].name).toBe(PROCESS_VIDEO_JOB);
+      expect(jobs[0].data).toEqual({ videoId: draft.id });
+      expect(jobs[0].opts.attempts).toBe(3);
+    });
+
+    it('should not create a second job on a repeated call', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+      await putOriginal(draft.public_id, 16);
+
+      await service.completeUpload(owner.id, draft.public_id);
+      const second = await service.completeUpload(owner.id, draft.public_id);
+
+      expect(second.processing_status).toBe(VideoProcessingStatus.UPLOADED);
+      expect(await queue.getJobs()).toHaveLength(1);
+    });
+
+    it('should enqueue once when two completions race', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+      await putOriginal(draft.public_id, 16);
+
+      const results = await Promise.all([
+        service.completeUpload(owner.id, draft.public_id),
+        service.completeUpload(owner.id, draft.public_id),
+      ]);
+
+      expect(
+        results.every(
+          (video) => video.processing_status === VideoProcessingStatus.UPLOADED,
+        ),
+      ).toBe(true);
+      expect(await queue.getJobs()).toHaveLength(1);
+    });
+
+    it('should throw UPLOAD_INCOMPLETE when the original is missing and keep the video awaiting upload', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+
+      await expect(
+        service.completeUpload(owner.id, draft.public_id),
+      ).rejects.toBeInstanceOf(UploadIncompleteException);
+
+      const stored = await videoRepository.findOneByOrFail({ id: draft.id });
+      expect(stored.processing_status).toBe(
+        VideoProcessingStatus.AWAITING_UPLOAD,
+      );
+      expect(await queue.getJobs()).toHaveLength(0);
+    });
+
+    it('should delete an oversized original and keep the video awaiting upload', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+      await putOriginal(draft.public_id, 16);
+      const realHead = await storageService.headObject(
+        `videos/${draft.public_id}/original`,
+      );
+      jest
+        .spyOn(storageService, 'headObject')
+        .mockResolvedValueOnce({ ...realHead, ContentLength: 10737418241 });
+
+      await expect(
+        service.completeUpload(owner.id, draft.public_id),
+      ).rejects.toBeInstanceOf(FileTooLargeException);
+
+      await expect(
+        storageService.headObject(`videos/${draft.public_id}/original`),
+      ).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+      const stored = await videoRepository.findOneByOrFail({ id: draft.id });
+      expect(stored.processing_status).toBe(
+        VideoProcessingStatus.AWAITING_UPLOAD,
+      );
+      expect(await queue.getJobs()).toHaveLength(0);
+    });
+
+    it('should reject a failed video with INVALID_VIDEO_STATE', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+      await videoRepository.update(
+        { id: draft.id },
+        { processing_status: VideoProcessingStatus.FAILED },
+      );
+
+      await expect(
+        service.completeUpload(owner.id, draft.public_id),
+      ).rejects.toBeInstanceOf(InvalidVideoStateException);
+    });
+
+    it('should hide the video of another channel behind VIDEO_NOT_FOUND', async () => {
+      const draft = await service.createDraft(owner.id, INPUT);
+
+      await expect(
+        service.completeUpload(stranger.id, draft.public_id),
       ).rejects.toBeInstanceOf(VideoNotFoundException);
     });
   });

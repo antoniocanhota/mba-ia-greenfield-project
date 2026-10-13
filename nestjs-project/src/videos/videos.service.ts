@@ -1,12 +1,28 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { S3ServiceException } from '@aws-sdk/client-s3';
+import type { Queue } from 'bullmq';
 import { QueryFailedError, Repository } from 'typeorm';
 import { ChannelsService } from '../channels/channels.service';
+import {
+  PROCESS_VIDEO_JOB,
+  PROCESS_VIDEO_JOB_OPTIONS,
+  VIDEOS_QUEUE,
+} from '../queue/queue.constants';
+import { originalKey } from '../storage/storage-keys';
 import { StorageService } from '../storage/storage.service';
 import { VideoResponseDto, toVideoResponse } from './dto/video-response.dto';
+import { VideoProcessingStatus } from './entities/video-enums';
 import { Video } from './entities/video.entity';
-import { VideoNotFoundException } from './exceptions/video.exceptions';
+import {
+  FileTooLargeException,
+  InvalidVideoStateException,
+  UploadIncompleteException,
+  VideoNotFoundException,
+} from './exceptions/video.exceptions';
 import { generatePublicId, isPublicIdFormat } from './public-id.util';
+import { MAX_VIDEO_SIZE_BYTES } from './videos.constants';
 
 const PG_UNIQUE_VIOLATION = '23505';
 const PUBLIC_ID_COLUMN = 'public_id';
@@ -38,6 +54,7 @@ export class VideosService {
     private readonly videoRepository: Repository<Video>,
     private readonly channelsService: ChannelsService,
     private readonly storageService: StorageService,
+    @InjectQueue(VIDEOS_QUEUE) private readonly videosQueue: Queue,
   ) {}
 
   // `sizeBytes` and `contentType` only gate the request (DTO validation); neither is
@@ -78,6 +95,66 @@ export class VideosService {
       throw new VideoNotFoundException();
     }
     return video;
+  }
+
+  // Confirms the uploaded original and hands the video to background processing.
+  // Idempotent: anything past `awaiting_upload` is returned as-is; `failed` is terminal.
+  async completeUpload(userId: string, publicId: string): Promise<Video> {
+    const video = await this.findOwnedByPublicId(userId, publicId);
+    if (video.processing_status === VideoProcessingStatus.FAILED) {
+      throw new InvalidVideoStateException();
+    }
+    if (video.processing_status !== VideoProcessingStatus.AWAITING_UPLOAD) {
+      return video;
+    }
+
+    const sizeBytes = await this.readUploadedSize(video.public_id);
+
+    // Conditional transition: loses cleanly against a concurrent completion or the sweep.
+    const { affected } = await this.videoRepository.update(
+      {
+        id: video.id,
+        processing_status: VideoProcessingStatus.AWAITING_UPLOAD,
+      },
+      {
+        processing_status: VideoProcessingStatus.UPLOADED,
+        size_bytes: sizeBytes,
+      },
+    );
+    const current = await this.videoRepository.findOneByOrFail({
+      id: video.id,
+    });
+    if (affected === 1) {
+      // After the commit. A failed enqueue leaves the video `uploaded` for the sweep.
+      await this.videosQueue.add(
+        PROCESS_VIDEO_JOB,
+        { videoId: video.id },
+        { jobId: video.id, ...PROCESS_VIDEO_JOB_OPTIONS },
+      );
+    }
+    return current;
+  }
+
+  private async readUploadedSize(publicId: string): Promise<number> {
+    const key = originalKey(publicId);
+    let contentLength: number;
+    try {
+      const head = await this.storageService.headObject(key);
+      contentLength = head.ContentLength ?? 0;
+    } catch (error) {
+      if (
+        error instanceof S3ServiceException &&
+        error.$metadata.httpStatusCode === 404
+      ) {
+        throw new UploadIncompleteException();
+      }
+      throw error;
+    }
+    if (contentLength > MAX_VIDEO_SIZE_BYTES) {
+      await this.storageService.deleteObject(key);
+      throw new FileTooLargeException();
+    }
+    return contentLength;
   }
 
   toResponse(video: Video): VideoResponseDto {

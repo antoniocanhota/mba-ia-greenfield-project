@@ -158,4 +158,50 @@ export class VideosController {
     );
     return this.uploadSigningService.sign(video, dto);
   }
+
+  @Post(':publicId/upload-completion')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Complete the upload and queue the video for processing',
+    description:
+      'Verifies the uploaded original, moves the video to `uploaded` and enqueues background processing. Idempotent: past `awaiting_upload` it returns the current state.',
+  })
+  @ApiParam({
+    name: 'publicId',
+    description: '11-character base64url public id of the video',
+    example: 'dQw4w9WgXcQ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Current state of the video',
+    type: VideoResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found (or not owned by the user)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Uploaded file not found, or the video has failed processing',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Uploaded file exceeds the 10GB limit',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async completeUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('publicId') publicId: string,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videosService.completeUpload(user.sub, publicId);
+    return this.videosService.toResponse(video);
+  }
 }
