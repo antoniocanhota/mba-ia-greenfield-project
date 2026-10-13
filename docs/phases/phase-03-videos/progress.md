@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 7/44 completed
+**SIs:** 8/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -60,9 +60,14 @@
   - `npm run lint` global tem 100+ erros pré-existentes (baseline 142 problemas); os arquivos tocados estão limpos.
 
 ### SI-03.2 — Entidade Video e migration CreateVideos
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 6 new passing (`video.entity.integration-spec.ts` 5, `videos.module.spec.ts` 1) + `migrations.integration-spec.ts` ampliado; suite completa 158 passing; e2e 52 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - Migration gerada via TypeORM CLI (`1791916388634-CreateVideos.ts`) e só formatada com Prettier; já aplicada no DB de dev pelo spec de migrations (`afterAll` re-aplica).
+  - Adicionar `Channel.videos` obrigou incluir `Video` nos arrays `ALL_ENTITIES` de 10 specs existentes (TypeORM falha com "Entity metadata for Channel#videos was not found" sem isso); mudança mecânica, sem alteração de comportamento.
+  - `migrations.integration-spec.ts`: o teste de revert agora desfaz `CreateVideos` (antes desfazia `CreateAuthTokens`) e confere que tabela e os 3 enums sumiram e as tabelas de token permanecem. O `beforeAll` passou a dropar também os tipos enum e a fazê-lo em sequência — o `Promise.all` de `DROP TABLE ... CASCADE` dava deadlock com a nova tabela ligada por FK, e a falta de `DROP TYPE` era a causa raiz do enum órfão (`verification_tokens_type_enum`) visto no SI-03.1.
+  - `VideosModule` só registra `TypeOrmModule.forFeature([Video])` e o exporta; service/controller entram nos SIs seguintes.
+  - Colunas `created_at`/`updated_at` de `videos` usam `timestamptz` (per Data Model); as tabelas anteriores usam `timestamp` sem fuso.
 
 ### SI-03.3 — Módulo de storage S3 (clients, keys, presign e configuração do bucket)
 - **Status:** pending
