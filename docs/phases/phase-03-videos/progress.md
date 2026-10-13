@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 11/44 completed
+**SIs:** 12/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -103,9 +103,14 @@
   - `npm run lint` em `src/channels/channels.service.ts` mantém os erros pré-existentes do helper `err as any` (baseline 26 problemas em `src/channels`).
 
 ### SI-03.6 — Endpoint POST /videos
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `videos-create.e2e-spec.ts` 5 passing (spec-derived, `nestjs-project/specs/videos-create.plan.md`); `videos.module.spec.ts` continua passando; suite unit/integration 212 passing; e2e 57 passing (duas rodadas seguidas); `tsc --noEmit` exit 0
+- **Observations:**
+  - `test/videos-create.e2e-spec.ts` foi autorado a partir do spec (1 `describe` com os 5 cenários, grupos como comentários). O usuário de teste é criado direto no banco (confirmado, com canal, senha argon2) e autenticado via `POST /auth/login`, como o spec pede.
+  - **Correção de config:** `npm run test:e2e` rodava as suítes em paralelo (o `test/jest-e2e.json` não tinha `maxWorkers`, ao contrário do que o CLAUDE.md afirma — "already configured"). Com 4 suítes compartilhando o mesmo banco e fazendo `cleanAllTables`, elas colidiam (login 500, `confirm-email` 401). Adicionado `"maxWorkers": 1` em `test/jest-e2e.json`. Provável causa também do flaky de `swagger.e2e-spec.ts` registrado em SI-03.3 (não confirmado).
+  - `CreateVideoDto` usa a constante `MAX_VIDEO_SIZE_BYTES` (`videos.constants.ts`), reaproveitável em `upload-completion` (SI-03.9). O controller devolve `VideosService.toResponse(video)` (em vez de chamar `toVideoResponse` direto) para injetar a URL pública da thumbnail.
+  - `@SkipThrottle()` fica no nível da classe do controller, valendo para os endpoints seguintes (SI-03.7 a 03.10).
+  - `src/metadata.js` (metadata do plugin Swagger) não foi regenerado; a operação aparece em `/api/docs-json` com 201/400/401 sem isso. O export do OpenAPI é o SI-03.15.
 
 ### SI-03.7 — Endpoint GET /videos/{publicId}
 - **Status:** pending
