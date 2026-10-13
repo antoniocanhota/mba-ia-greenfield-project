@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 5/44 completed
+**SIs:** 6/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -35,14 +35,17 @@
 - **Tests:** 18 passing
 - **Observations:**
   - `processing-status.tsx` define localmente a união de `processingStatus` (`ProcessingStatusValue`) porque `lib/api/contracts.ts` só ganha `VideoProcessingStatus` em SI-03.16; trocar pelo tipo do contrato depois.
-  - `thumb-upload.tsx` usa `<img>` (com `eslint-disable @next/next/no-img-element`) em vez de `next/image`, por ser URL public-read do storage (TD-09) fora de `remotePatterns`.
   - `upload-progress-panel.tsx` arredonda e limita o percentual a 0–100 antes de renderizar texto e barra, garantindo que os dois nunca divergem.
-  - Ícones de copiar (inline no `copy-link-button.tsx`) e spinners (CSS) foram feitos sem fetch do Figma; o audit dos screens pode ajustar.
+  - O ícone de copiar (`copy-icon.tsx`) e os spinners (CSS) foram feitos sem fetch do Figma; o audit dos screens pode ajustar.
 
 ### SI-03.0.6 — Custom-business simple group: video-details-card + video-player + video-status-badge
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 8 passing
+- **Observations:**
+  - `video-details-card.tsx` recebe também `duration` (opcional, "—" quando ausente), pois a variante `ready` exibe duração (SI-03.32); o plano só cita Filename e Video Quality.
+  - O card mantém `src`/`poster` como props e delega ao `VideoPlayer`, sem `src` mostra o placeholder preto com "0:00" (OQ-8).
+  - Correções pós-revisão em SI-03.0.5 (regras `next-frontend-code-quality.md` / `next-frontend-ui.md`): `thumb-upload.tsx` passou a usar `next/image` (`fill` + `unoptimized`, pois o host do storage varia por ambiente e não está em `remotePatterns`) e o SVG inline de `copy-link-button.tsx` virou `components/icons/copy-icon.tsx`.
+  - `video-player.tsx` usa `<video>` nativo (não há `next/image` envolvido).
 
 ### SI-03.1 — Infra: dependências, namespaces de config e serviços de storage e fila no Compose
 - **Status:** pending
