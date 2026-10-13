@@ -3,10 +3,11 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-08T08:08:31-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-13T14:12:07-03:00"
   docs/phases/phase-03-videos/library-refs.md: "2026-10-07T15:20:25-03:00"
   docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-08T08:04:12-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
+  docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:11:00-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-09-28T14:55:47-03:00"
@@ -693,28 +694,61 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ### SI-03.18 — Handlers MSW de vídeos (`mocks/handlers/videos.ts`)
 
-**Description:** Fornecer o upstream falso dos cinco endpoints de vídeos para os testes de BFF (Vitest) e para o E2E (instrumentation), com fixtures tipadas por `paths`.
+**Description:** Fornecer o upstream falso dos cinco endpoints de vídeos para os testes de BFF (Vitest) e para o E2E (instrumentation), com fixtures tipadas por `paths` e um store em memória por `publicId` que torna observável a sequência rascunho → `upload-completion` → polling.
 
 **Technical actions:**
 
 1. Criar `mocks/factories/videos.ts` — `buildVideo(overrides?)` e `buildMediaUrls(overrides?)` hand-written e determinísticos, tipados por `paths` (per `next-frontend-openapi-typing/TD-05`, `next-frontend-msw-foundation/TD-03`).
-2. Criar `mocks/handlers/videos.ts` — um handler por `(method, path)` de `POST /videos`, `GET /videos/{publicId}`, `POST /videos/{publicId}/upload-signatures`, `POST /videos/{publicId}/upload-completion` e `GET /videos/{publicId}/media-urls` sob `env.API_URL`, com sucesso por default (per `next-frontend-msw-foundation/TD-01`, `next-frontend-msw-foundation/TD-04`).
-3. Definir uma tabela pequena de trigger fixtures reservadas, documentada no topo do arquivo e sem colisão com os triggers de auth: `publicId` (11 caracteres, formato de `phase-03-videos/TD-07`) `missingVid1` → 404 `VIDEO_NOT_FOUND`; `failedVid01` → vídeo `failed` com `failureReason: "not_a_video"`; `readyVid001` → vídeo `ready` com metadados e `thumbnailUrl`; `procVid0001` → `processing`; `filename` `"too-large.mp4"` → 400 `VALIDATION_ERROR` no `POST /videos` (per `next-frontend/CLAUDE.md` § "E2E architecture").
-4. Registrar `videosHandlers` no barrel `mocks/handlers/index.ts`.
+2. Criar em `mocks/handlers/videos.ts` o store em memória por `publicId`: `POST /videos` gera o `publicId` por contador de módulo (`vid` + número zero-padded, 11 caracteres — formato de `phase-03-videos/TD-07`, ex.: `vid00000001`) e registra o vídeo em `awaiting_upload`; `upload-completion` move o registro para `uploaded` com o `sizeBytes` do pré-cadastro; `GET /videos/{publicId}` e `GET /videos/{publicId}/media-urls` leem o registro; `publicId` desconhecido e não reservado devolve a fixture default em `awaiting_upload`. Exportar `resetVideoStore()`, que limpa os registros e zera o contador (per `e2e-video-upload-fixtures/TD-02` e revisão 2026-10-13).
+3. Criar `mocks/storage-origin.ts` com a constante `E2E_STORAGE_ORIGIN = "http://storage.e2e.invalid"` (sem importar `env`, para o Playwright no host poder importá-la); `POST /videos/{publicId}/upload-signatures` devolve `url` nessa origem com path `/videos/{publicId}/original` e query de assinatura fictícia, e `key: "videos/{publicId}/original"` no `CreateMultipartUpload` (per `e2e-video-upload-fixtures/TD-01`; `phase-03-videos/TD-04`).
+4. Definir a tabela de trigger fixtures reservadas, stateless e com precedência sobre o store, documentada no topo do arquivo e sem colisão com os triggers de auth nem com o padrão `vid…` do contador: `publicId` `missingVid1` → 404 `VIDEO_NOT_FOUND`; `failedVid01` → vídeo `failed` com `failureReason: "not_a_video"`; `readyVid001` → vídeo `ready` com metadados e `thumbnailUrl`; `procVid0001` → `processing`; `filename` `"too-large.mp4"` → 400 `VALIDATION_ERROR` no `POST /videos` (per `next-frontend/CLAUDE.md` § "E2E architecture").
+5. Registrar `videosHandlers` no barrel `mocks/handlers/index.ts` e chamar `resetVideoStore()` no `afterEach` de `mocks/setup.ts`, ao lado de `server.resetHandlers()` (per `next-frontend-msw-foundation/TD-04`).
 
-**Tests:** _(empty — fixtures exercitadas pelos testes de integração dos Route Handlers SI-03.19 a SI-03.23)_
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `mocks/handlers/videos.ts` | Integration (msw/node) per testing-guide-next-frontend § "Utilities" (boundary module) — `POST /videos` → `GET` em `awaiting_upload` → `upload-completion` → `GET` em `uploaded`; após `resetVideoStore()` o primeiro `publicId` volta a ser `vid00000001`; triggers reservados prevalecem sobre o store; `upload-signatures` devolve `url` em `E2E_STORAGE_ORIGIN` e a key do rascunho | `mocks/handlers/__tests__/videos.integration.test.ts` |
 
 **Dependencies:** SI-03.16
 
 **Acceptance criteria:**
 
 - Com MSW ativo, cada um dos cinco endpoints upstream de vídeos responde com fixture tipada, e nenhum teste de vídeos falha com "request unhandled".
-- Os triggers reservados produzem as respostas da tabela documentada no arquivo.
+- Depois de um `POST /videos`, o `GET` do `publicId` retornado devolve `awaiting_upload`; depois do `upload-completion`, o mesmo `GET` devolve `uploaded`.
+- Em todo teste Vitest, o primeiro `POST /videos` devolve `publicId` `vid00000001`.
+- `upload-signatures` devolve `url` na origem `http://storage.e2e.invalid` e, no `CreateMultipartUpload`, `key: "videos/{publicId}/original"`.
+- Os triggers reservados produzem as respostas da tabela documentada no arquivo, independentemente do estado do store.
 - `docker compose exec next-frontend npx tsc --noEmit` sai com código 0 com as fixtures tipadas por `paths`.
 
 ---
 
-### SI-03.19 — BFF Route Handler: POST /api/videos
+### SI-03.19 — Fake de storage no Playwright e documentação das exceções de E2E
+
+**Description:** Responder no browser, durante o E2E, às operações S3 que o Uppy envia às URLs pré-assinadas da origem reservada, e documentar as duas exceções às convenções de E2E/MSW.
+
+**Technical actions:**
+
+1. Criar `tests/storage-fake.ts` — `routeStorageFake(page)` registra `page.route()` apenas para `${E2E_STORAGE_ORIGIN}/**` (importado de `mocks/storage-origin.ts`) e responde ao subconjunto S3 usado pelo `@uppy/aws-s3`: `POST` sem `uploadId` → XML `InitiateMultipartUploadResult` com `UploadId`; `PUT` com `uploadId` + `partNumber` → `200` com `ETag`, `Access-Control-Expose-Headers: ETag` e `Access-Control-Allow-Origin`; `GET` com `uploadId` → XML `ListPartsResult`; `POST` com `uploadId` → XML `CompleteMultipartUploadResult`; `DELETE` → `204` (per `e2e-video-upload-fixtures/TD-01`; library-refs.md → @uppy/aws-s3 `signRequest`).
+2. Auto-aplicar `routeStorageFake(page)` no fixture `network` de `tests/fixtures.ts`, mantendo a proibição de interceptar `/api/**` no browser (per `next-frontend/CLAUDE.md` § "E2E architecture").
+3. Atualizar `next-frontend/CLAUDE.md` § "E2E architecture" — documentar o fake de storage via `page.route()` restrito à origem reservada como exceção permitida, e o store em memória dos handlers de vídeos (contador determinístico + `resetVideoStore()`) como exceção à convenção stateless de triggers reservados (per `e2e-video-upload-fixtures/TD-01`, `e2e-video-upload-fixtures/TD-02`).
+4. Atualizar `.claude/rules/next-frontend-msw-mocks.md` (store stateful só para recursos com ciclo de vida, IDs determinísticos, reset no `afterEach` de `mocks/setup.ts`) e a linha "Object Storage (S3/MinIO)" de `.claude/skills/testing-guide-next-frontend/references/external-systems.md` (de "Fake (deferred)" para o fake de browser no E2E) (per `e2e-video-upload-fixtures/TD-02`).
+
+**Tests:** _(empty — infraestrutura de teste; exercitada pelos specs E2E de SI-03.30b e SI-03.31b gerados por /plan-test-specs)_
+
+**Dependencies:** SI-03.18
+
+**Acceptance criteria:**
+
+- Num teste Playwright com o fixture `network`, um `PUT` feito pelo browser a uma URL de `http://storage.e2e.invalid` responde `200` com o header `ETag` legível por JavaScript.
+- Um `POST` sem `uploadId` à mesma origem devolve XML com um `UploadId`, e um `POST` com `uploadId` devolve XML de conclusão.
+- Nenhuma requisição a `/api/**` é interceptada pelo browser (os Route Handlers continuam respondendo).
+- `next-frontend/CLAUDE.md` e `.claude/rules/next-frontend-msw-mocks.md` descrevem as duas exceções citando `e2e-video-upload-fixtures/TD-01` e `e2e-video-upload-fixtures/TD-02`.
+- `docker compose exec next-frontend npx tsc --noEmit` e `docker compose exec next-frontend npm run lint` saem com código 0.
+
+---
+
+### SI-03.20 — BFF Route Handler: POST /api/videos
 
 **Route:** POST /api/videos
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → BFF tier → `#### POST /api/videos`
@@ -742,7 +776,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.20 — BFF Route Handler: GET /api/videos/{publicId}
+### SI-03.21 — BFF Route Handler: GET /api/videos/{publicId}
 
 **Route:** GET /api/videos/{publicId}
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → BFF tier → `#### GET /api/videos/{publicId}`
@@ -770,7 +804,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.21 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
+### SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
 
 **Route:** POST /api/videos/{publicId}/upload-signatures
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → BFF tier → `#### POST /api/videos/{publicId}/upload-signatures`
@@ -798,7 +832,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
+### SI-03.23 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
 
 **Route:** POST /api/videos/{publicId}/upload-completion
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → BFF tier → `#### POST /api/videos/{publicId}/upload-completion`
@@ -826,7 +860,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.23 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
+### SI-03.24 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
 
 **Route:** GET /api/videos/{publicId}/media-urls
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → BFF tier → `#### GET /api/videos/{publicId}/media-urls`
@@ -854,7 +888,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.24 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
+### SI-03.25 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
 
 **Description:** Adicionar ao frontend o cliente de upload decidido para o multipart pré-assinado retomável.
 
@@ -874,7 +908,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.25 — Provider de upload (Uppy headless) para o studio
+### SI-03.26 — Provider de upload (Uppy headless) para o studio
 
 **Description:** Manter uma única instância Uppy num Client Provider acima das rotas de `/studio`, para que o upload iniciado em `/studio/upload` continue em `/studio/videos/[publicId]` e retome falhas de rede dentro da sessão.
 
@@ -892,7 +926,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 | `create-uppy.ts` | Unit per testing-guide-next-frontend § "Utilities" — chunk mínimo de 5 MiB e teto de 10000 partes; restrições rejeitam arquivo não-vídeo, acima de 10 GiB e segundo arquivo; `signRequest` envia o body esperado ao endpoint do `publicId` (`fetch` stubado) | `lib/studio/__tests__/create-uppy.test.ts` |
 | `upload-provider.tsx` | Unit per testing-guide-next-frontend § "Client Components" — eventos `upload-progress` atualizam `progress`; `upload-success` chama `upload-completion` e expõe o `video`; `422` vira `phase: "error"` com `FILE_TOO_LARGE` | `components/studio/__tests__/upload-provider.test.tsx` |
 
-**Dependencies:** SI-03.21, SI-03.22, SI-03.24
+**Dependencies:** SI-03.22, SI-03.23, SI-03.25
 
 **Acceptance criteria:**
 
@@ -904,7 +938,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.26 — Hook de polling `useVideoStatus`
+### SI-03.27 — Hook de polling `useVideoStatus`
 
 **Description:** Propagar o status de processamento ao frontend por short polling no BFF, com o mecanismo hand-rolled decidido.
 
@@ -919,7 +953,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 |----------|-------|-----------|
 | `use-video-status.ts` | Unit per testing-guide-next-frontend § "Hooks" (`renderHook`, jsdom, fake timers, MSW) — não faz polling em `awaiting_upload`/`ready`/`failed`; faz polling a cada ~3s em `uploaded`/`processing`; nunca sobrepõe requisições com resposta lenta; para ao receber `ready`; `setVideo` com `uploaded` inicia o polling; unmount cancela o timer | `hooks/__tests__/use-video-status.test.tsx` |
 
-**Dependencies:** SI-03.20
+**Dependencies:** SI-03.21
 
 **Acceptance criteria:**
 
@@ -929,7 +963,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.27 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
+### SI-03.28 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
 
 **Description:** Concentrar no frontend a derivação de rótulos a partir dos valores numéricos do contrato e a copy dos estados — única fonte para as três telas.
 
@@ -955,7 +989,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 ---
 
-### SI-03.28 — Layout de `/studio` (auth gate, SideNav e provider de upload)
+### SI-03.29 — Layout de `/studio` (auth gate, SideNav e provider de upload)
 
 **Description:** Criar o shell comum das rotas do studio: bloqueio de anônimos, app chrome e a instância Uppy compartilhada.
 
@@ -968,7 +1002,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 
 Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Layouts").
 
-**Dependencies:** SI-03.0.4, SI-03.25
+**Dependencies:** SI-03.0.4, SI-03.26
 
 **Acceptance criteria:**
 
@@ -978,7 +1012,7 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
 
 ---
 
-### SI-03.29.0 — Drift audit: Tela de upload de vídeo
+### SI-03.30.0 — Drift audit: Tela de upload de vídeo
 
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2728-2142
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela de upload de vídeo`
@@ -991,7 +1025,7 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
    - Server-connected component names: [`UploadDropzone`, `SelectFilesButton`]
    - Target paths (read-only context; no writes here): `app/studio/upload/page.tsx` + `components/studio/upload-dropzone.tsx`
 
-   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores (`alinhado` / `drift menor` / `drift relevante` / `componente ausente`); compor Decision per default policy (`.claude/skills/plan-build/references/frontend-drift-report-schema.md`); escrever a seção `## Screen: upload — audited at SI-03.29.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`. Ignorar nomes de camada e dados de exemplo do Figma (OQ-13) e o bloco de inscrições da SideNav (OQ-2). **Sem edits de código.**
+   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores (`alinhado` / `drift menor` / `drift relevante` / `componente ausente`); compor Decision per default policy (`.claude/skills/plan-build/references/frontend-drift-report-schema.md`); escrever a seção `## Screen: upload — audited at SI-03.30.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`. Ignorar nomes de camada e dados de exemplo do Figma (OQ-13) e o bloco de inscrições da SideNav (OQ-2). **Sem edits de código.**
 
 **Dependencies:** SI-03.0.4, SI-03.0.5
 
@@ -1006,7 +1040,7 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
 
 ---
 
-### SI-03.29a — Tela de upload de vídeo (visual shell)
+### SI-03.30a — Tela de upload de vídeo (visual shell)
 
 **Route:** /studio/upload
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2728-2142
@@ -1024,9 +1058,9 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
 
    Copy no singular ("Drag and drop a video file to upload" / "Select file") (OQ-5); heading "Upload Video".
 
-**Dependencies:** SI-03.29.0 + SI-03.0.4, SI-03.0.5, SI-03.28
+**Dependencies:** SI-03.30.0 + SI-03.0.4, SI-03.0.5, SI-03.29
 
-**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.29b; E2E in /plan-test-specs spec)_
+**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.30b; E2E in /plan-test-specs spec)_
 
 **Acceptance criteria:**
 
@@ -1036,20 +1070,20 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
 
 ---
 
-### SI-03.29b — Tela de upload de vídeo (lógica & wiring)
+### SI-03.30b — Tela de upload de vídeo (lógica & wiring)
 
 **Test Specs:** _pending /plan-test-specs_
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela de upload de vídeo`
 
 **Technical actions:**
 
-1. **Route guard + rendering strategy** — `app/studio/upload/page.tsx` como RSC estático compondo `components/studio/upload-dropzone.tsx` marcado `"use client"`; a rota herda o gate `Authenticated` do layout de `/studio` (SI-03.28) (per UI Contract `**Auth requirement:**` e `**Rendering strategy:**`; per `phase-02-auth-frontend/TD-06`).
+1. **Route guard + rendering strategy** — `app/studio/upload/page.tsx` como RSC estático compondo `components/studio/upload-dropzone.tsx` marcado `"use client"`; a rota herda o gate `Authenticated` do layout de `/studio` (SI-03.29) (per UI Contract `**Auth requirement:**` e `**Rendering strategy:**`; per `phase-02-auth-frontend/TD-06`).
 2. **Endpoint wiring** — ao soltar/selecionar: `useUpload().addFile(file)` (restrições do Uppy) → `fetch("/api/videos", { method: "POST" })` com `{ filename, sizeBytes, contentType }` tipado por `CreateVideoDto` de `@/lib/api/contracts` → `start(publicId)` → `router.push("/studio/videos/{publicId}")` (per `### API Contracts` → BFF tier `#### POST /api/videos`; per `phase-03-videos/TD-05`, `phase-03-videos/TD-06`, `phase-03-videos/TD-07`).
 3. **Estados** — dropzone desabilitada com spinner do envio do arquivo até o redirect; drag-over destacado (per UI Contract `*Rendered states:*`; OQ-4).
 4. **Error mapping** — erro de restrição do Uppy e `400 VALIDATION_ERROR` → erro inline na dropzone; erro de rede/5xx → erro inline "falha no pré-cadastro" com nova tentativa possível e `clear()` do Uppy; `401 UNAUTHORIZED` → redirect `/login` (per UI Contract `**Error Catalog → UX mapping:**`).
 5. **Client-side validation mirror** — um arquivo, `video/*`, até 10 GiB e nome com 1–255 caracteres checados antes do `POST /api/videos` (per UI Contract `**Client-side validation mirror:**`).
 
-**Dependencies:** SI-03.29a, SI-03.19, SI-03.25, SI-03.16
+**Dependencies:** SI-03.30a, SI-03.20, SI-03.26, SI-03.16, SI-03.19
 
 **Tests:**
 
@@ -1068,7 +1102,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 
 ---
 
-### SI-03.30.0 — Drift audit: Tela do vídeo no studio — upload em andamento
+### SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload em andamento
 
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2734-2140
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload em andamento`
@@ -1081,7 +1115,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
    - Server-connected component names: [`UploadProgressPanel`, `CardVideoConfig`]
    - Target paths (read-only context; no writes here): `app/studio/videos/[publicId]/page.tsx` + `components/studio/video-studio-view.tsx` + `components/studio/upload-progress-panel.tsx` + `components/studio/video-details-card.tsx`
 
-   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores; compor Decision per default policy; escrever a seção `## Screen: video-uploading — audited at SI-03.30.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`. Fora do escopo do diff: formulário de metadados, "Change Thumbnail", Category, Visibility, Cancel/Save Changes e CheckStatus (OQ-1, OQ-3). **Sem edits de código.**
+   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores; compor Decision per default policy; escrever a seção `## Screen: video-uploading — audited at SI-03.31.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`. Fora do escopo do diff: formulário de metadados, "Change Thumbnail", Category, Visibility, Cancel/Save Changes e CheckStatus (OQ-1, OQ-3). **Sem edits de código.**
 
 **Dependencies:** SI-03.0.1, SI-03.0.2, SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6
 
@@ -1096,7 +1130,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 
 ---
 
-### SI-03.30a — Tela do vídeo no studio — upload em andamento (visual shell)
+### SI-03.31a — Tela do vídeo no studio — upload em andamento (visual shell)
 
 **Route:** /studio/videos/[publicId]
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2734-2140
@@ -1114,9 +1148,9 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 
    Heading estático "Video details" (OQ-7); layout em duas colunas com UploadProgressPanel e SectionHeader "Thumbnail" + ThumbUpload à esquerda e CardVideoConfig à direita; sem o formulário de metadados e sem rodapé de ações (OQ-1).
 
-**Dependencies:** SI-03.30.0 + SI-03.0.1, SI-03.0.2, SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6, SI-03.28
+**Dependencies:** SI-03.31.0 + SI-03.0.1, SI-03.0.2, SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6, SI-03.29
 
-**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.30b; E2E in /plan-test-specs spec)_
+**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.31b; E2E in /plan-test-specs spec)_
 
 **Acceptance criteria:**
 
@@ -1126,7 +1160,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 
 ---
 
-### SI-03.30b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
+### SI-03.31b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
 
 **Test Specs:** _pending /plan-test-specs_
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload em andamento`
@@ -1139,7 +1173,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 4. **Error mapping** — `UPLOAD_INCOMPLETE` → mensagem no painel com o seletor de reanexação; `FILE_TOO_LARGE` → mensagem "arquivo acima de 10GB" no painel; `INVALID_VIDEO_STATE` → recarrega via `GET /api/videos/{publicId}` e renderiza o estado atual; `UNAUTHORIZED` → redirect `/login` (per UI Contract `**Error Catalog → UX mapping:**`).
 5. **Acessibilidade** — `ProgressLinear` com `role="progressbar"` e `aria-valuenow`; mudanças de status anunciadas por live region (per UI Contract `**Accessibility notes:**`).
 
-**Dependencies:** SI-03.30a, SI-03.20, SI-03.22, SI-03.25, SI-03.26, SI-03.27
+**Dependencies:** SI-03.31a, SI-03.21, SI-03.23, SI-03.26, SI-03.27, SI-03.28, SI-03.19
 
 **Tests:**
 
@@ -1161,7 +1195,7 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
 ---
 
-### SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
+### SI-03.32.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
 
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2734-2196
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload concluído (player + download)`
@@ -1174,9 +1208,9 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
    - Server-connected component names: [`Video player`, `CardVideoConfig`, `ThumbUpload`, `ProcessingStatus`, `DownloadButton`]
    - Target paths (read-only context; no writes here): `app/studio/videos/[publicId]/page.tsx` + `components/studio/video-studio-view.tsx` + `components/studio/video-details-card.tsx`
 
-   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores; compor Decision per default policy; escrever a seção `## Screen: video-ready — audited at SI-03.31.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`, consultando a seção `video-uploading` como `prior_decisions` (mesma rota). DownloadButton e `download-icon.tsx` não têm node Figma (OQ-9) — classificar sem diff visual. **Sem edits de código.**
+   Para cada componente da Reused DS list, fazer value-level diff contra o arquivo em disco e classificar per o enum de 4 valores; compor Decision per default policy; escrever a seção `## Screen: video-ready — audited at SI-03.32.0 ({YYYY-MM-DD})` em `docs/phases/phase-03-videos/frontend-drift-report.md`, consultando a seção `video-uploading` como `prior_decisions` (mesma rota). DownloadButton e `download-icon.tsx` não têm node Figma (OQ-9) — classificar sem diff visual. **Sem edits de código.**
 
-**Dependencies:** SI-03.30.0 (prior decisions da mesma rota), SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6
+**Dependencies:** SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6
 
 **Tests:** _(empty — audit-only; the report is the deliverable)_
 
@@ -1189,7 +1223,7 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
 ---
 
-### SI-03.31a — Tela do vídeo no studio — upload concluído (visual shell)
+### SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
 
 **Route:** /studio/videos/[publicId]
 **Figma:** https://www.figma.com/design/dfxpXk5c5urLHMh4axx5cq/FC-Tube?node-id=2734-2196
@@ -1207,9 +1241,9 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
    DownloadButton secundário "Download" com `download-icon`, abaixo do VideoLink dentro do CardVideoConfig (OQ-9); ProcessingStatus no rodapé no lugar do CheckStatus (OQ-3).
 
-**Dependencies:** SI-03.31.0 + SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6, SI-03.30a
+**Dependencies:** SI-03.32.0 + SI-03.0.3, SI-03.0.4, SI-03.0.5, SI-03.0.6, SI-03.31a
 
-**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.31b; E2E in /plan-test-specs spec)_
+**Tests:** _(empty — shell smoke-gated by build AC; Unit tests live in SI-03.32b; E2E in /plan-test-specs spec)_
 
 **Acceptance criteria:**
 
@@ -1219,20 +1253,20 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
 ---
 
-### SI-03.31b — Tela do vídeo no studio — upload concluído (lógica & wiring)
+### SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 
 **Test Specs:** _pending /plan-test-specs_
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload concluído (player + download)`
 
 **Technical actions:**
 
-1. **Rendering strategy** — mesma página RSC e `video-studio-view.tsx` de SI-03.30b; a variante `ready` é escolhida por `processingStatus === "ready"`, seja no carregamento inicial, seja quando o polling chega a `ready` (per UI Contract `**Rendering strategy:**`; per `phase-03-videos/TD-11`).
+1. **Rendering strategy** — mesma página RSC e `video-studio-view.tsx` de SI-03.31b; a variante `ready` é escolhida por `processingStatus === "ready"`, seja no carregamento inicial, seja quando o polling chega a `ready` (per UI Contract `**Rendering strategy:**`; per `phase-03-videos/TD-11`).
 2. **Endpoint wiring — mídia** — ao entrar em `ready`, `fetch("/api/videos/{publicId}/media-urls")` uma vez, tipado por `MediaUrlsResponse`; `VideoPlayer` recebe `src = streamUrl` e `poster = thumbnailUrl` (`<video controls>` nativo, OQ-8); DownloadButton recebe `href = downloadUrl` e fica desabilitado até as URLs chegarem (per `### API Contracts` → BFF tier `#### GET /api/videos/{publicId}/media-urls`; per `phase-03-videos/TD-08`, `phase-03-videos/TD-09`).
 3. **Dados exibidos** — ThumbUpload com `thumbnailUrl`; duração via `formatDuration(durationMs)` e qualidade via `qualityLabel(width, height)`; filename original; ProcessingStatus com `processingStatusCopy("ready")` (per `video-metadata/TD-03`, `video-metadata/TD-05`).
 4. **Error mapping** — falha ou `409 VIDEO_NOT_READY` ao buscar as URLs → player sem `src` com mensagem curta e DownloadButton desabilitado; `UNAUTHORIZED` → redirect `/login` (per UI Contract `**Error Catalog → UX mapping:**`).
 5. **Acessibilidade** — DownloadButton desabilitado expõe `aria-disabled`; ícones decorativos com `aria-hidden`; `CopyLinkButton` com `aria-label` (per UI Contract `**Accessibility notes:**`).
 
-**Dependencies:** SI-03.31a, SI-03.30b, SI-03.23, SI-03.27
+**Dependencies:** SI-03.32a, SI-03.31b, SI-03.24, SI-03.28
 
 **Tests:**
 
@@ -1442,7 +1476,7 @@ Emite as URLs pré-assinadas de entrega do MP4 normalizado (phase-03-videos/TD-0
 
 > _BFF tier — frontend-exposed contract. O browser chama a rota same-origin; a rota faz proxy para o upstream conforme o modelo strict-BFF documentado em `next-frontend/CLAUDE.md` (next-frontend-config-base/TD-03). A fonte de verdade do contrato é a cadeia `openapi.json` → `lib/api/types.gen.ts` → `paths`; os endpoints upstream abaixo são os do backend tier desta mesma fase, publicados no `openapi.json` pelo SI de export/sync antes de qualquer Route Handler ser escrito. Todas as rotas: leem o iron-session; sem sessão → 401 sem chamar o upstream; injetam `Authorization: Bearer {session.accessToken}` server-side e passam pelo `withRefresh` single-flight (per phase-02-auth-frontend/TD-02, phase-02-auth-frontend/TD-03)._
 
-#### POST /api/videos (SI-03.19)
+#### POST /api/videos (SI-03.20)
 
 **forwards-to:** `POST /videos` *(derived: project contract source)*
 
@@ -1459,7 +1493,7 @@ Emite as URLs pré-assinadas de entrega do MP4 normalizado (phase-03-videos/TD-0
 
 ---
 
-#### GET /api/videos/{publicId} (SI-03.20)
+#### GET /api/videos/{publicId} (SI-03.21)
 
 **forwards-to:** `GET /videos/{publicId}` *(derived: project contract source)*
 
@@ -1475,7 +1509,7 @@ Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `pro
 
 ---
 
-#### POST /api/videos/{publicId}/upload-signatures (SI-03.21)
+#### POST /api/videos/{publicId}/upload-signatures (SI-03.22)
 
 **forwards-to:** `POST /videos/{publicId}/upload-signatures` *(derived: project contract source)*
 
@@ -1494,7 +1528,7 @@ Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `pro
 
 ---
 
-#### POST /api/videos/{publicId}/upload-completion (SI-03.22)
+#### POST /api/videos/{publicId}/upload-completion (SI-03.23)
 
 **forwards-to:** `POST /videos/{publicId}/upload-completion` *(derived: project contract source)*
 
@@ -1510,7 +1544,7 @@ Consumido pelo hook de polling (~3s, sem requests sobrepostos, só enquanto `pro
 
 ---
 
-#### GET /api/videos/{publicId}/media-urls (SI-03.23)
+#### GET /api/videos/{publicId}/media-urls (SI-03.24)
 
 **forwards-to:** `GET /videos/{publicId}/media-urls` *(derived: project contract source)*
 
@@ -1650,7 +1684,7 @@ Não há evento push para o frontend: o status chega por short polling de `GET /
 - `components/ui/button.tsx` — SelectFilesButton — Abre o seletor de arquivos nativo; a seleção dispara o pré-cadastro + upload (mesmo fluxo da dropzone)
 
 **Server-connected components:**
-- `UploadDropzone` — verbs: Pré-cadastrar o vídeo como rascunho ao selecionar ou soltar o arquivo; Iniciar o envio do arquivo de vídeo (até 10GB) para o armazenamento; Obter o identificador público único do vídeo recém-criado para redirecionar à sua página | endpoint: `POST /api/videos` (§API Contracts → BFF tier — see for `forwards-to` + request/response/projection); o envio começa aqui pelo Uppy via `POST /api/videos/{publicId}/upload-signatures` (§API Contracts → BFF tier) | reuse: `components/studio/upload-dropzone.tsx (new)`
+- `UploadDropzone` — verbs: Pré-cadastrar o vídeo como rascunho ao selecionar ou soltar o arquivo; Iniciar o envio do arquivo de vídeo (até 10GB) para o armazenamento; Obter o identificador público único do vídeo recém-criado para redirecionar à sua página | endpoint: `POST /api/videos` (§API Contracts → BFF tier — see for `forwards-to` + request/response/projection); o envio começa aqui pelo Uppy via `POST /api/videos/{publicId}/upload-signatures` (§API Contracts → BFF tier) | reuse: `components/studio/upload-dropzone.tsx (new)` _(E2E: per `e2e-video-upload-fixtures/TD-01`, `e2e-video-upload-fixtures/TD-02`)_
 - `SelectFilesButton` — verbs: Pré-cadastrar o vídeo como rascunho ao selecionar ou soltar o arquivo; Iniciar o envio do arquivo de vídeo (até 10GB) para o armazenamento | endpoint: `POST /api/videos` (§API Contracts → BFF tier) | reuse: `components/ui/button.tsx`
 
 **Behaviors:**
@@ -1710,7 +1744,7 @@ Não há evento push para o frontend: o status chega por short polling de `GET /
 - `components/studio/thumb-upload.tsx (new)` — ThumbUpload — Placeholder de thumbnail (descrição DS: "shown on upload screens before processing completes")
 
 **Server-connected components:**
-- `UploadProgressPanel` — verbs: Enviar o arquivo do vídeo direto ao armazenamento em partes, de forma retomável; Exibir o progresso do envio do arquivo de vídeo; Concluir o envio e marcar o vídeo como enviado para processamento; Acompanhar o status de processamento do vídeo após o envio | endpoint: `POST /api/videos/{publicId}/upload-signatures`, `POST /api/videos/{publicId}/upload-completion`, `GET /api/videos/{publicId}` (§API Contracts → BFF tier — see for `forwards-to` + request/response/projection) | reuse: `components/studio/upload-progress-panel.tsx (new)`
+- `UploadProgressPanel` — verbs: Enviar o arquivo do vídeo direto ao armazenamento em partes, de forma retomável; Exibir o progresso do envio do arquivo de vídeo; Concluir o envio e marcar o vídeo como enviado para processamento; Acompanhar o status de processamento do vídeo após o envio | endpoint: `POST /api/videos/{publicId}/upload-signatures`, `POST /api/videos/{publicId}/upload-completion`, `GET /api/videos/{publicId}` (§API Contracts → BFF tier — see for `forwards-to` + request/response/projection) | reuse: `components/studio/upload-progress-panel.tsx (new)` _(E2E: storage per `e2e-video-upload-fixtures/TD-01`; estado dos handlers per `e2e-video-upload-fixtures/TD-02`)_
 - `CardVideoConfig` — verbs: Exibir os dados do rascunho do vídeo pré-cadastrado; Exibir a URL única do vídeo | endpoint: `GET /api/videos/{publicId}` (§API Contracts → BFF tier; carga inicial via RSC + atualizações do polling) | reuse: `components/studio/video-details-card.tsx (new)`
 
 **Behaviors:**
@@ -1861,16 +1895,17 @@ Frontend (next-frontend) — cross-layer edge: SI-03.16 depends on SI-03.15 (bac
 SI-03.16 — depends on SI-03.15 (aliases derivados do `types.gen.ts` regenerado)
 ├── SI-03.17 — depends on SI-03.16 (helper tipado pelos aliases)
 ├── SI-03.18 — depends on SI-03.16 (fixtures tipadas)
-│   ├── SI-03.19 — depends on SI-03.17, SI-03.18 (POST /api/videos)
-│   ├── SI-03.20 — depends on SI-03.17, SI-03.18 (GET /api/videos/{publicId})
-│   │   └── SI-03.26 — depends on SI-03.20 (polling usa a rota de leitura)
-│   ├── SI-03.21 — depends on SI-03.17, SI-03.18 (upload-signatures)
-│   ├── SI-03.22 — depends on SI-03.17, SI-03.18 (upload-completion)
-│   │   └── SI-03.25 — depends on SI-03.21, SI-03.22, SI-03.24 (provider assina partes e conclui o upload)
-│   │       └── SI-03.28 — depends on SI-03.0.4, SI-03.25 (layout compõe SideNav + provider)
-│   └── SI-03.23 — depends on SI-03.17, SI-03.18 (media-urls)
-└── SI-03.27 — depends on SI-03.16 (format usa os tipos derivados do contrato)
-SI-03.24 (root — infra: @uppy/core + @uppy/aws-s3)
+│   ├── SI-03.19 — depends on SI-03.18 (fake de storage usa a origem reservada exportada pelos handlers)
+│   ├── SI-03.20 — depends on SI-03.17, SI-03.18 (POST /api/videos)
+│   ├── SI-03.21 — depends on SI-03.17, SI-03.18 (GET /api/videos/{publicId})
+│   │   └── SI-03.27 — depends on SI-03.21 (polling usa a rota de leitura)
+│   ├── SI-03.22 — depends on SI-03.17, SI-03.18 (upload-signatures)
+│   ├── SI-03.23 — depends on SI-03.17, SI-03.18 (upload-completion)
+│   │   └── SI-03.26 — depends on SI-03.22, SI-03.23, SI-03.25 (provider assina partes e conclui o upload)
+│   │       └── SI-03.29 — depends on SI-03.0.4, SI-03.26 (layout compõe SideNav + provider)
+│   └── SI-03.24 — depends on SI-03.17, SI-03.18 (media-urls)
+└── SI-03.28 — depends on SI-03.16 (format usa os tipos derivados do contrato)
+SI-03.25 (root — infra: @uppy/core + @uppy/aws-s3)
 
 Bootstrap (next-frontend)
 
@@ -1883,20 +1918,20 @@ SI-03.0.4 (root — ícones + SideNav)
 
 Telas
 
-SI-03.29.0 — depends on SI-03.0.4, SI-03.0.5 (audit lê os componentes da tela de upload)
-└── SI-03.29a — depends on SI-03.29.0 + SI-03.0.4, SI-03.0.5, SI-03.28
-    └── SI-03.29b — depends on SI-03.29a, SI-03.19, SI-03.25, SI-03.16
+SI-03.30.0 — depends on SI-03.0.4, SI-03.0.5 (audit lê os componentes da tela de upload)
+└── SI-03.30a — depends on SI-03.30.0 + SI-03.0.4, SI-03.0.5, SI-03.29
+    └── SI-03.30b — depends on SI-03.30a, SI-03.20, SI-03.26, SI-03.16, SI-03.19
 
-SI-03.30.0 — depends on SI-03.0.1 … SI-03.0.6 (audit lê todos os componentes do studio)
-└── SI-03.30a — depends on SI-03.30.0 + SI-03.0.1 … SI-03.0.6, SI-03.28
-    └── SI-03.30b — depends on SI-03.30a, SI-03.20, SI-03.22, SI-03.25, SI-03.26, SI-03.27
+SI-03.31.0 — depends on SI-03.0.1 … SI-03.0.6 (audit lê todos os componentes do studio)
+└── SI-03.31a — depends on SI-03.31.0 + SI-03.0.1 … SI-03.0.6, SI-03.29
+    └── SI-03.31b — depends on SI-03.31a, SI-03.21, SI-03.23, SI-03.26, SI-03.27, SI-03.28, SI-03.19
 
-SI-03.31.0 — depends on SI-03.30.0 (prior decisions da mesma rota), SI-03.0.3 … SI-03.0.6
-└── SI-03.31a — depends on SI-03.31.0 + SI-03.0.3 … SI-03.0.6, SI-03.30a
-    └── SI-03.31b — depends on SI-03.31a, SI-03.30b, SI-03.23, SI-03.27
+SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 … SI-03.0.6
+└── SI-03.32a — depends on SI-03.32.0 + SI-03.0.3 … SI-03.0.6, SI-03.31a
+    └── SI-03.32b — depends on SI-03.32a, SI-03.31b, SI-03.24, SI-03.28
 ```
 
-**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.24` a qualquer momento; frontend `SI-03.16 → SI-03.28` após `SI-03.15`; telas por último, na ordem `29 → 30 → 31`.
+**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.25` a qualquer momento; frontend `SI-03.16 → SI-03.29` após `SI-03.15`; telas por último, na ordem `30 → 31 → 32`.
 
 ---
 
@@ -1926,25 +1961,26 @@ SI-03.31.0 — depends on SI-03.30.0 (prior decisions da mesma rota), SI-03.0.3 
 - [ ] SI-03.16 — Aliases de contrato de vídeos em `lib/api/contracts.ts`
 - [ ] SI-03.17 — Helper de chamada autenticada ao upstream (`lib/auth/authorized-upstream.ts`)
 - [ ] SI-03.18 — Handlers MSW de vídeos (`mocks/handlers/videos.ts`)
-- [ ] SI-03.19 — BFF Route Handler: POST /api/videos
-- [ ] SI-03.20 — BFF Route Handler: GET /api/videos/{publicId}
-- [ ] SI-03.21 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
-- [ ] SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
-- [ ] SI-03.23 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
-- [ ] SI-03.24 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
-- [ ] SI-03.25 — Provider de upload (Uppy headless) para o studio
-- [ ] SI-03.26 — Hook de polling `useVideoStatus`
-- [ ] SI-03.27 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
-- [ ] SI-03.28 — Layout de `/studio` (auth gate, SideNav e provider de upload)
-- [ ] SI-03.29.0 — Drift audit: Tela de upload de vídeo
-- [ ] SI-03.29a — Tela de upload de vídeo (visual shell)
-- [ ] SI-03.29b — Tela de upload de vídeo (lógica & wiring)
-- [ ] SI-03.30.0 — Drift audit: Tela do vídeo no studio — upload em andamento
-- [ ] SI-03.30a — Tela do vídeo no studio — upload em andamento (visual shell)
-- [ ] SI-03.30b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
-- [ ] SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
-- [ ] SI-03.31a — Tela do vídeo no studio — upload concluído (visual shell)
-- [ ] SI-03.31b — Tela do vídeo no studio — upload concluído (lógica & wiring)
+- [ ] SI-03.19 — Fake de storage no Playwright e documentação das exceções de E2E
+- [ ] SI-03.20 — BFF Route Handler: POST /api/videos
+- [ ] SI-03.21 — BFF Route Handler: GET /api/videos/{publicId}
+- [ ] SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
+- [ ] SI-03.23 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
+- [ ] SI-03.24 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
+- [ ] SI-03.25 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
+- [ ] SI-03.26 — Provider de upload (Uppy headless) para o studio
+- [ ] SI-03.27 — Hook de polling `useVideoStatus`
+- [ ] SI-03.28 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
+- [ ] SI-03.29 — Layout de `/studio` (auth gate, SideNav e provider de upload)
+- [ ] SI-03.30.0 — Drift audit: Tela de upload de vídeo
+- [ ] SI-03.30a — Tela de upload de vídeo (visual shell)
+- [ ] SI-03.30b — Tela de upload de vídeo (lógica & wiring)
+- [ ] SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload em andamento
+- [ ] SI-03.31a — Tela do vídeo no studio — upload em andamento (visual shell)
+- [ ] SI-03.31b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
+- [ ] SI-03.32.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
+- [ ] SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
+- [ ] SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 
 **Per-screen deliverables:**
 
