@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 10/44 completed
+**SIs:** 11/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -91,9 +91,16 @@
   - `VideosModule` importa `QueueModule`, então `videos.module.spec.ts` agora precisa de `ConfigModule.forRoot({ isGlobal: true, load: [queueConfig] })`. Nenhum processor é registrado na API.
 
 ### SI-03.5 — VideosService: rascunho, ownership e mapeamento de resposta
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 38 new passing (`public-id.util.spec.ts` 15, `video-response.dto.spec.ts` 7, `videos.service.spec.ts` 9, `videos.service.integration-spec.ts` 5) + 2 em `channels.service.integration-spec.ts` (`findByUserId`); suite completa 212 passing; e2e 52 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - `toVideoResponse(video, publicUrl)` recebe a função de URL pública como segundo argumento (o plano cita só `toVideoResponse(video)`): `thumbnailUrl` depende de `S3_PUBLIC_ENDPOINT` + bucket, então a função continua pura e o `VideosService.toResponse(video)` injeta `StorageService.publicUrl`.
+  - `createDraft` recebe `sizeBytes`/`contentType` só como entrada já validada (interface `CreateDraftInput`); nenhum dos dois é persistido (o tamanho vem do `HeadObject` na conclusão). O `CreateVideoDto` fica para SI-03.6.
+  - Usuário sem canal em `createDraft` lança `Error` genérico (500): todo usuário recebe canal no registro e o Error Catalog não prevê código para isso.
+  - `findOwnedByPublicId` valida o formato antes de consultar e resolve ownership numa única query (`channel: { user_id }`); os três casos (formato inválido, inexistente, de outro canal) dão `VideoNotFoundException`.
+  - `VideosModule` agora importa `ChannelsModule`, `QueueModule` e `StorageModule` e exporta `VideosService`; `videos.module.spec.ts` carrega `queueConfig` e `storageConfig`.
+  - O teste de integração do `VideosService` usa um stub de `StorageService` (só `publicUrl`), pois o storage não é o objeto sob teste.
+  - `npm run lint` em `src/channels/channels.service.ts` mantém os erros pré-existentes do helper `err as any` (baseline 26 problemas em `src/channels`).
 
 ### SI-03.6 — Endpoint POST /videos
 - **Status:** pending
