@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 6/44 completed
+**SIs:** 7/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -48,9 +48,16 @@
   - `video-player.tsx` usa `<video>` nativo (não há `next/image` envolvido).
 
 ### SI-03.1 — Infra: dependências, namespaces de config e serviços de storage e fila no Compose
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 12 passing (`env.validation.integration-spec.ts`); suite completa 152 passing; e2e 52 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - **Desvio do TD-01:** a imagem `minio/minio` não puxa mais (Docker Hub: `pull access denied`; `quay.io/minio/minio:latest` inexistente), contrariando a revisão de 2026-10-07 ("fixar a última tag community"). Com aprovação do usuário, o serviço `storage` usa `rustfs/rustfs:1.0.1` (fallback drop-in previsto no próprio TD-01, Option B). Mesmos nomes de serviço/portas (9000/9001), envs `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` e CORS por `RUSTFS_CORS_ALLOWED_ORIGINS=http://localhost:3001` (em vez de `MINIO_API_CORS_ALLOW_ORIGIN`). `/health` e `/minio/health/live` respondem 200. O TD-01 deveria ganhar uma revisão registrando a troca.
+  - Redis fixado em `redis:8.2-alpine`; `nestjs-api` depende de `storage` e `redis` (ambos `service_healthy`). ffmpeg/ffprobe 5.1.9 instalados via apt no `Dockerfile.dev`.
+  - npm resolveu `@aws-sdk/*` para `^3.1150.0` e `bullmq` para `^6.3.14` (patches mais novos que os de library-refs; mesmos ranges).
+  - `S3_BUCKET` do `.env.example` = `streamtube-videos` (o plano não fixa o nome); credenciais dev do storage em `compose.yaml` coincidem com `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` do `.env.example`. `.env` local (gitignored) recebeu as mesmas chaves.
+  - `env.validation.integration-spec.ts`: `validate` agora devolve um tipo explícito, o que eliminou os erros `no-unsafe-*` pré-existentes do arquivo.
+  - **Suite completa:** na primeira rodada `src/database/migrations.integration-spec.ts` falhou por estado sujo no DB compartilhado (`type "verification_tokens_type_enum" already exists`, enum órfão + tabela `migrations`). O usuário executou os dois `DROP`; após a limpeza, unit/integration 152 passing (23 suítes) e e2e 52 passing.
+  - `npm run lint` global tem 100+ erros pré-existentes (baseline 142 problemas); os arquivos tocados estão limpos.
 
 ### SI-03.2 — Entidade Video e migration CreateVideos
 - **Status:** pending
