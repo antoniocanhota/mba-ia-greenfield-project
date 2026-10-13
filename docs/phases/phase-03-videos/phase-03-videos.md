@@ -337,7 +337,7 @@ Testes de integração usam o MinIO real do Compose, na mesma linha do Mailpit p
 ### SI-03.6 — Endpoint POST /videos
 
 **Route:** POST /videos
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-create.plan.md`
 **Authorization:** Authenticated
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → `#### POST /videos`
 
@@ -373,7 +373,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 ### SI-03.7 — Endpoint GET /videos/{publicId}
 
 **Route:** GET /videos/{publicId}
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-get.plan.md`
 **Authorization:** Owner
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → `#### GET /videos/{publicId}`
 
@@ -399,7 +399,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 ### SI-03.8 — Endpoint POST /videos/{publicId}/upload-signatures
 
 **Route:** POST /videos/{publicId}/upload-signatures
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-signatures.plan.md`
 **Authorization:** Owner
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → `#### POST /videos/{publicId}/upload-signatures`
 
@@ -436,7 +436,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 ### SI-03.9 — Endpoint POST /videos/{publicId}/upload-completion
 
 **Route:** POST /videos/{publicId}/upload-completion
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-completion.plan.md`
 **Authorization:** Owner
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → `#### POST /videos/{publicId}/upload-completion`
 
@@ -472,7 +472,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 ### SI-03.10 — Endpoint GET /videos/{publicId}/media-urls
 
 **Route:** GET /videos/{publicId}/media-urls
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-media-urls.plan.md`
 **Authorization:** Owner
 **API Contract:** see `## Technical Specifications` → `### API Contracts` → `#### GET /videos/{publicId}/media-urls`
 
@@ -1072,7 +1072,7 @@ Layouts com auth gate são cobertos via E2E (testing-guide-next-frontend § "Lay
 
 ### SI-03.30b — Tela de upload de vídeo (lógica & wiring)
 
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `next-frontend/specs/video-upload.plan.md`
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela de upload de vídeo`
 
 **Technical actions:**
@@ -1162,7 +1162,7 @@ E2E da página (fluxo de seleção → redirect, gate de anônimo) é autorado e
 
 ### SI-03.31b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
 
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `next-frontend/specs/video-uploading.plan.md`
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload em andamento`
 
 **Technical actions:**
@@ -1255,7 +1255,7 @@ E2E da página (upload até `uploaded`, reload em "Envio interrompido", 404 para
 
 ### SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `next-frontend/specs/video-ready.plan.md`
 **UI Contract:** see `## Technical Specifications` → `### UI Contracts` → `#### Screen: Tela do vídeo no studio — upload concluído (player + download)`
 
 **Technical actions:**
