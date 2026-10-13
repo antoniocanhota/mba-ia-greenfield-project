@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 8/44 completed
+**SIs:** 9/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -70,9 +70,16 @@
   - Colunas `created_at`/`updated_at` de `videos` usam `timestamptz` (per Data Model); as tabelas anteriores usam `timestamp` sem fuso.
 
 ### SI-03.3 — Módulo de storage S3 (clients, keys, presign e configuração do bucket)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 14 new passing (`storage-keys.spec.ts` 3, `storage.service.integration-spec.ts` 7, `storage-bucket.initializer.integration-spec.ts` 4); suite completa 172 passing; e2e 52 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - Os testes de integração rodam contra o RustFS real do Compose (ver desvio do TD-01 em SI-03.1), cada spec com um bucket `test-<hex>` próprio, criado e apagado por ela (`src/test/storage-test-config.ts`), sem tocar o bucket de dev. Lifecycle `AbortIncompleteMultipartUpload` e bucket policy anônima foram aceitos pelo RustFS; `GET` anônimo dá 200 em `thumbnails/*` e 403 em `videos/*`.
+  - Dentro do container o endpoint público (`localhost:9000`) não resolve, então os testes que usam URL pré-assinada chamam o endpoint interno mantendo o header `Host` público (a assinatura cobre o host) via `fetchViaInternalEndpoint` (`node:http`).
+  - `StorageService.uploadFile` envia até 64 MiB com um `PutObject` e acima disso em partes de 64 MiB (CreateMultipartUpload/UploadPart/Complete, abort em falha), porque `PutObject` limita a 5 GiB e o vídeo normalizado pode chegar a 10 GiB; `@aws-sdk/lib-storage` não está no plano e não foi adicionado. Coberto por teste com arquivo de 64 MiB + 1 KiB.
+  - O inicializador ficou num `StorageBucketModule` próprio (importado só pelo `AppModule`), já que o worker (SI-03.11) importa apenas `StorageModule`. Por isso a API passa a exigir o storage acessível no boot, inclusive nos e2e (usam o bucket `S3_BUCKET` de dev).
+  - `StorageModule` exporta também o token `S3_INTERNAL_CLIENT`, necessário para o inicializador; `publicObjectUrl` recebe `(publicEndpoint, bucket, key)` (função pura) e `StorageService.publicUrl(key)` aplica a config.
+  - **Flaky:** uma rodada de e2e falhou em `test/swagger.e2e-spec.ts` (3 testes; saída não capturada, causa não identificada); o spec passou isolado e em duas rodadas completas seguintes (52 passing). Vale observar se reaparece com o boot mais lento da API.
+  - `npm run lint` aponta 1 erro pré-existente em `src/test/create-test-data-source.ts` (`Function`); fora de escopo.
 
 ### SI-03.4 — Módulo de fila BullMQ (conexão Redis e fila `videos`)
 - **Status:** pending
