@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/44 completed
+**SIs:** 10/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -82,9 +82,13 @@
   - `npm run lint` aponta 1 erro pré-existente em `src/test/create-test-data-source.ts` (`Function`); fora de escopo.
 
 ### SI-03.4 — Módulo de fila BullMQ (conexão Redis e fila `videos`)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 2 new passing (`queue.module.spec.ts`); `videos.module.spec.ts` ajustado (1 passing); suite completa 174 passing; e2e 52 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - **Desvio de versão:** `@nestjs/bullmq@^12.0.0` (library-refs.md / SI-03.1) é ESM-only (`"type": "module"`), então o Jest CommonJS não carrega o pacote (`SyntaxError: Unexpected token 'export'`). Fixado em `^11.0.5` — CJS e dentro da faixa que o TD-02 aceita (11.0.5/12.0.0, Nest 11 + bullmq 6), coerente com a justificativa do TD de "fits the CommonJS build". `library-refs.md` e o texto de SI-03.1 ainda dizem `^12.0.0`.
+  - **Dependência faltante no plano:** `bullmq` 6 trata `ioredis` como peer opcional e falha ao criar a `Queue` sem ele ("could not load the optional 'ioredis' package"). Instalado `ioredis@^5.11.1` (peer `>=5.0.0`); não consta em SI-03.1 nem em library-refs.
+  - O teste de conexão usa `queue.waitUntilReady()` + `getJobCounts()` (bullmq 6 removeu o getter `queue.client`). Fica como `*.spec.ts` conforme o plano, abrindo conexão real com o Redis do Compose (mesmo precedente de `channels.module.spec.ts` com o banco).
+  - `VideosModule` importa `QueueModule`, então `videos.module.spec.ts` agora precisa de `ConfigModule.forRoot({ isGlobal: true, load: [queueConfig] })`. Nenhum processor é registrado na API.
 
 ### SI-03.5 — VideosService: rascunho, ownership e mapeamento de resposta
 - **Status:** pending
