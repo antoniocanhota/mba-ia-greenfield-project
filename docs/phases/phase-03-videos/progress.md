@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 12/44 completed
+**SIs:** 13/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -113,9 +113,12 @@
   - `src/metadata.js` (metadata do plugin Swagger) não foi regenerado; a operação aparece em `/api/docs-json` com 201/400/401 sem isso. O export do OpenAPI é o SI-03.15.
 
 ### SI-03.7 — Endpoint GET /videos/{publicId}
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `videos-get.e2e-spec.ts` 4 passing (spec-derived, `nestjs-project/specs/videos-get.plan.md`); suite unit/integration 212 passing; e2e 61 passing (duas rodadas seguidas); `tsc --noEmit` exit 0
+- **Observations:**
+  - O plano marca Tests como vazio (E2E vem do spec de `/plan-test-specs`); o e2e foi autorado a partir do spec, 1 `describe` com 4 cenários (200 do dono, 404 de outro canal/inexistente com respostas idênticas, 404 de formato inválido, 401).
+  - Extraído `src/test/e2e-users.ts` (`createLoggedInUser`: usuário confirmado + canal + login real) para os e2e de vídeos seguintes não duplicarem o setup; `videos-create.e2e-spec.ts` (SI-03.6) foi ajustado para usá-lo, sem mudar o comportamento.
+  - `:publicId` é lido sem pipe de validação, de propósito: formato inválido deve virar 404 `VIDEO_NOT_FOUND` (e não 400).
 
 ### SI-03.8 — Endpoint POST /videos/{publicId}/upload-signatures
 - **Status:** pending

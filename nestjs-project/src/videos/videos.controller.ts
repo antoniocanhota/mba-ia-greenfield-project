@@ -1,7 +1,16 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
   getSchemaPath,
@@ -50,6 +59,44 @@ export class VideosController {
     @Body() dto: CreateVideoDto,
   ): Promise<VideoResponseDto> {
     const video = await this.videosService.createDraft(user.sub, dto);
+    return this.videosService.toResponse(video);
+  }
+
+  @Get(':publicId')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get a video of the authenticated user',
+    description:
+      'Returns the video to its owner. Unknown, malformed or foreign public ids are indistinguishable (404).',
+  })
+  @ApiParam({
+    name: 'publicId',
+    description: '11-character base64url public id of the video',
+    example: 'dQw4w9WgXcQ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Video found',
+    type: VideoResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found (or not owned by the user)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async findOne(
+    @CurrentUser() user: JwtPayload,
+    @Param('publicId') publicId: string,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videosService.findOwnedByPublicId(
+      user.sub,
+      publicId,
+    );
     return this.videosService.toResponse(video);
   }
 }

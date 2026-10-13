@@ -2,7 +2,6 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
-import * as argon2 from 'argon2';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
@@ -12,10 +11,9 @@ import { DomainExceptionFilter } from '../src/common/filters/domain-exception.fi
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import { buildSwaggerConfig } from '../src/swagger/swagger-document';
 import { cleanAllTables } from '../src/test/create-test-data-source';
-import { User } from '../src/users/entities/user.entity';
+import { createLoggedInUser } from '../src/test/e2e-users';
 import { Video } from '../src/videos/entities/video.entity';
 
-const PASSWORD = 'password123';
 const VALID_BODY = {
   filename: 'my-video.mp4',
   sizeBytes: 1048576,
@@ -66,20 +64,12 @@ describe('videos-create (e2e)', () => {
     await cleanAllTables(dataSource);
     throttlerStorage.storage.clear();
 
-    const user = await dataSource.getRepository(User).save({
-      email: 'owner@example.com',
-      password: await argon2.hash(PASSWORD),
-      is_confirmed: true,
-    });
-    channel = await dataSource
-      .getRepository(Channel)
-      .save({ name: 'owner', nickname: 'owner', user_id: user.id });
-
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'owner@example.com', password: PASSWORD })
-      .expect(200);
-    accessToken = (login.body as { access_token: string }).access_token;
+    ({ channel, accessToken } = await createLoggedInUser(
+      app,
+      dataSource,
+      'owner@example.com',
+      'owner',
+    ));
     throttlerStorage.storage.clear();
   });
 
