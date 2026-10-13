@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 3/44 completed
+**SIs:** 4/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -23,9 +23,12 @@
 - **Observations:** none
 
 ### SI-03.0.4 — Custom-business simple group: download-icon + upload-icon + video-file-icon + side-nav-item + side-nav
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 7 passing
+- **Observations:**
+  - Os três ícones usam paths Material Symbols (viewBox 0 -960 960 960) em vez de assets do Figma; não houve fetch via Figma MCP nesta SI. Os screens `.0` (audit) podem ajustar se o desenho divergir.
+  - Todos os itens da SideNav (Home, Subscriptions, Your videos, Liked videos) renderizam desabilitados, pois nenhuma dessas rotas existe nesta fase (OQ-12); `/studio` (Your videos) também fica desabilitado até a fase seguinte. O estado ativo funciona via `usePathname` mas ainda não é exercitado por um item habilitado na SideNav.
+  - `npm run lint` mostra 1 warning pré-existente em `components/auth/signup-form.tsx` (React Hook Form `watch`); fora de escopo.
 
 ### SI-03.0.5 — Custom-business simple group: copy-link-button + processing-status + thumb-upload + upload-dropzone + upload-progress-panel
 - **Status:** pending
