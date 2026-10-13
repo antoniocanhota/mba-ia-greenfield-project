@@ -1,17 +1,21 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { S3ServiceException } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import type { Queue } from 'bullmq';
 import { QueryFailedError, Repository } from 'typeorm';
 import { ChannelsService } from '../channels/channels.service';
+import storageConfig from '../config/storage.config';
 import {
   PROCESS_VIDEO_JOB,
   PROCESS_VIDEO_JOB_OPTIONS,
   VIDEOS_QUEUE,
 } from '../queue/queue.constants';
-import { originalKey } from '../storage/storage-keys';
+import { originalKey, videoKey } from '../storage/storage-keys';
 import { StorageService } from '../storage/storage.service';
+import { downloadDisposition } from './download-disposition.util';
+import { MediaUrlsResponseDto } from './dto/media-urls-response.dto';
 import { VideoResponseDto, toVideoResponse } from './dto/video-response.dto';
 import { VideoProcessingStatus } from './entities/video-enums';
 import { Video } from './entities/video.entity';
@@ -20,6 +24,7 @@ import {
   InvalidVideoStateException,
   UploadIncompleteException,
   VideoNotFoundException,
+  VideoNotReadyException,
 } from './exceptions/video.exceptions';
 import { generatePublicId, isPublicIdFormat } from './public-id.util';
 import { MAX_VIDEO_SIZE_BYTES } from './videos.constants';
@@ -55,6 +60,8 @@ export class VideosService {
     private readonly channelsService: ChannelsService,
     private readonly storageService: StorageService,
     @InjectQueue(VIDEOS_QUEUE) private readonly videosQueue: Queue,
+    @Inject(storageConfig.KEY)
+    private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
   // `sizeBytes` and `contentType` only gate the request (DTO validation); neither is
@@ -133,6 +140,39 @@ export class VideosService {
       );
     }
     return current;
+  }
+
+  // Presigned delivery of the normalized MP4: the bytes never go through the API.
+  async getMediaUrls(
+    userId: string,
+    publicId: string,
+  ): Promise<MediaUrlsResponseDto> {
+    const video = await this.findOwnedByPublicId(userId, publicId);
+    if (video.processing_status !== VideoProcessingStatus.READY) {
+      throw new VideoNotReadyException();
+    }
+    const ttl = this.storage.videoUrlTtlSeconds;
+    const base = {
+      Bucket: this.storageService.bucket,
+      Key: videoKey(video.public_id),
+    };
+    const [streamUrl, downloadUrl] = await Promise.all([
+      this.storageService.presign(new GetObjectCommand(base), ttl),
+      this.storageService.presign(
+        new GetObjectCommand({
+          ...base,
+          ResponseContentDisposition: downloadDisposition(
+            video.original_filename,
+          ),
+        }),
+        ttl,
+      ),
+    ]);
+    return {
+      streamUrl,
+      downloadUrl,
+      expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+    };
   }
 
   private async readUploadedSize(publicId: string): Promise<number> {

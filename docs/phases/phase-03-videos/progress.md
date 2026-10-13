@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 15/44 completed
+**SIs:** 16/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -142,9 +142,15 @@
   - Cenário de objeto >10 GiB: `jest.spyOn(storageService, 'headObject')` devolve `ContentLength: 10737418241` sobre o objeto real (equivalente ao `overrideProvider` do spec); `deleteObject` roda de verdade e o teste confirma o 404 no storage.
 
 ### SI-03.10 — Endpoint GET /videos/{publicId}/media-urls
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 20 new unit/integration passing (`download-disposition.util.spec.ts` 10, `videos.service.spec.ts` +7, `videos.service.integration-spec.ts` +3) + `videos-media-urls.e2e-spec.ts` 5 passing (spec-derived, `nestjs-project/specs/videos-media-urls.plan.md`); suite unit/integration 274 passing; e2e 79 passing (duas rodadas seguidas); `tsc --noEmit` exit 0
+- **Observations:**
+  - `VideosService` agora também injeta `storageConfig` (para `VIDEO_URL_TTL_SECONDS`), 5ª dependência; construtores manuais nos specs ajustados.
+  - O header de download vem de `download-disposition.util.ts` (não previsto no plano): `attachment; filename="<ASCII>"; filename*=UTF-8''<RFC 5987>`. Aspas, barras e `%` do nome original são neutralizados e acentos vão só no `filename*`, para um nome como `Férias.mov` não quebrar o header nem a assinatura. Nomes sem base utilizável caem em `video.mp4`.
+  - `streamUrl` é um `GetObject` sem disposition (inline); `downloadUrl` é o mesmo objeto com `ResponseContentDisposition`. O RustFS atendeu `Range: bytes=0-1023` com `206` e `Content-Range`, e devolveu o `Content-Disposition` assinado.
+  - `expiresAt` = `Date.now() + TTL` calculado no service, independente do relógio do storage; com o default (14400 s) fica ~4 h à frente.
+  - `fetchViaInternalEndpoint` passou a aceitar `headers` (necessário para o `Range`).
+  - Os e2e gravam um `video.mp4` de 4 KiB no bucket de dev e o removem em `afterEach`.
 
 ### SI-03.11 — Entrypoint do worker e serviço `video-worker` no Compose
 - **Status:** pending

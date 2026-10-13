@@ -1,4 +1,4 @@
-import { S3ServiceException } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import { QueryFailedError } from 'typeorm';
 import { ChannelsService } from '../channels/channels.service';
 import { Channel } from '../channels/entities/channel.entity';
@@ -10,6 +10,7 @@ import {
   InvalidVideoStateException,
   UploadIncompleteException,
   VideoNotFoundException,
+  VideoNotReadyException,
 } from './exceptions/video.exceptions';
 import * as publicIdUtil from './public-id.util';
 import { VideosService } from './videos.service';
@@ -37,6 +38,8 @@ describe('VideosService', () => {
     findOneByOrFail: jest.Mock;
   };
   let storage: {
+    bucket: string;
+    presign: jest.Mock;
     publicUrl: jest.Mock;
     headObject: jest.Mock;
     deleteObject: jest.Mock;
@@ -53,6 +56,15 @@ describe('VideosService', () => {
       findOneByOrFail: jest.fn(),
     };
     storage = {
+      bucket: 'bucket',
+      presign: jest.fn(
+        (command: { input: { ResponseContentDisposition?: string } }) =>
+          Promise.resolve(
+            command.input.ResponseContentDisposition
+              ? 'signed-download'
+              : 'signed-stream',
+          ),
+      ),
       publicUrl: jest.fn(),
       headObject: jest.fn(),
       deleteObject: jest.fn().mockResolvedValue(undefined),
@@ -68,6 +80,7 @@ describe('VideosService', () => {
       channelsService as unknown as ChannelsService,
       storage as unknown as StorageService,
       queue as never,
+      { videoUrlTtlSeconds: 14400 } as never,
     );
   });
 
@@ -338,6 +351,82 @@ describe('VideosService', () => {
       await expect(
         service.completeUpload('user-id', 'abcDEF12345'),
       ).rejects.toBe(failure);
+    });
+  });
+
+  describe('getMediaUrls', () => {
+    const readyVideo = (filename = 'My Trip.mov'): Video =>
+      Object.assign(new Video(), {
+        id: 'video-uuid',
+        public_id: 'abcDEF12345',
+        original_filename: filename,
+        processing_status: VideoProcessingStatus.READY,
+      });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it.each([
+      VideoProcessingStatus.AWAITING_UPLOAD,
+      VideoProcessingStatus.UPLOADED,
+      VideoProcessingStatus.PROCESSING,
+      VideoProcessingStatus.FAILED,
+    ])('should throw VIDEO_NOT_READY while %s', async (status) => {
+      repository.findOne.mockResolvedValue(
+        Object.assign(new Video(), {
+          public_id: 'abcDEF12345',
+          processing_status: status,
+        }),
+      );
+
+      await expect(
+        service.getMediaUrls('user-id', 'abcDEF12345'),
+      ).rejects.toBeInstanceOf(VideoNotReadyException);
+      expect(storage.presign).not.toHaveBeenCalled();
+    });
+
+    it('should presign an inline stream URL and an attachment download URL for the normalized MP4', async () => {
+      repository.findOne.mockResolvedValue(readyVideo());
+
+      const result = await service.getMediaUrls('user-id', 'abcDEF12345');
+
+      expect(result.streamUrl).toBe('signed-stream');
+      expect(result.downloadUrl).toBe('signed-download');
+      const commands = storage.presign.mock.calls.map(
+        ([command]) => command as GetObjectCommand,
+      );
+      expect(commands).toHaveLength(2);
+      for (const command of commands) {
+        expect(command).toBeInstanceOf(GetObjectCommand);
+        expect(command.input.Bucket).toBe('bucket');
+        expect(command.input.Key).toBe('videos/abcDEF12345/video.mp4');
+      }
+      const [stream, download] = commands;
+      expect(stream.input.ResponseContentDisposition).toBeUndefined();
+      expect(download.input.ResponseContentDisposition).toContain(
+        'attachment; filename="My Trip.mp4"',
+      );
+    });
+
+    it('should presign both URLs with the configured TTL and report matching expiresAt', async () => {
+      repository.findOne.mockResolvedValue(readyVideo());
+      jest.useFakeTimers({ now: new Date('2026-10-13T12:00:00.000Z') });
+
+      const result = await service.getMediaUrls('user-id', 'abcDEF12345');
+
+      for (const [, expiresIn] of storage.presign.mock.calls) {
+        expect(expiresIn).toBe(14400);
+      }
+      expect(result.expiresAt).toBe('2026-10-13T16:00:00.000Z');
+    });
+
+    it('should hide a video of another channel behind VIDEO_NOT_FOUND', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getMediaUrls('user-id', 'abcDEF12345'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
     });
   });
 });

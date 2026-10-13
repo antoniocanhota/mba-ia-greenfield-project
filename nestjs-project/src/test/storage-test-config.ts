@@ -57,7 +57,11 @@ export interface InternalFetchResult {
 export function fetchViaInternalEndpoint(
   url: string,
   config: StorageTestConfig,
-  init: { method?: string; body?: Buffer | string } = {},
+  init: {
+    method?: string;
+    body?: Buffer | string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<InternalFetchResult> {
   const publicUrl = new URL(url);
   const internal = new URL(config.endpoint as string);
@@ -69,6 +73,7 @@ export function fetchViaInternalEndpoint(
         path: `${publicUrl.pathname}${publicUrl.search}`,
         method: init.method ?? 'GET',
         headers: {
+          ...init.headers,
           host: publicUrl.host,
           // S3 rejects chunked uploads; UploadPart needs an explicit length.
           ...(init.body !== undefined && {

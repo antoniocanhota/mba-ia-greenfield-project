@@ -21,6 +21,7 @@ import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { MediaUrlsResponseDto } from './dto/media-urls-response.dto';
 import { SignUploadRequestDto } from './dto/sign-upload-request.dto';
 import { SignUploadResponseDto } from './dto/sign-upload-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
@@ -203,5 +204,44 @@ export class VideosController {
   ): Promise<VideoResponseDto> {
     const video = await this.videosService.completeUpload(user.sub, publicId);
     return this.videosService.toResponse(video);
+  }
+
+  @Get(':publicId/media-urls')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get presigned streaming and download URLs',
+    description:
+      'Issues presigned GET URLs for the normalized MP4 of a ready video: one for streaming (HTTP Range served by the storage) and one for download. Owner only.',
+  })
+  @ApiParam({
+    name: 'publicId',
+    description: '11-character base64url public id of the video',
+    example: 'dQw4w9WgXcQ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned URLs',
+    type: MediaUrlsResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found (or not owned by the user)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video is not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getMediaUrls(
+    @CurrentUser() user: JwtPayload,
+    @Param('publicId') publicId: string,
+  ): Promise<MediaUrlsResponseDto> {
+    return this.videosService.getMediaUrls(user.sub, publicId);
   }
 }

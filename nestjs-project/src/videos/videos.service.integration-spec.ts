@@ -22,6 +22,7 @@ import {
 import {
   buildTestStorageConfig,
   deleteTestBucket,
+  fetchViaInternalEndpoint,
 } from '../test/storage-test-config';
 import { User } from '../users/entities/user.entity';
 import {
@@ -100,6 +101,7 @@ describe('VideosService (integration)', () => {
       new ChannelsService(dataSource),
       storageService,
       queue,
+      bucketConfig,
     );
   });
 
@@ -301,6 +303,76 @@ describe('VideosService (integration)', () => {
       await expect(
         service.completeUpload(stranger.id, draft.public_id),
       ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+  });
+
+  describe('getMediaUrls', () => {
+    async function readyVideoWithMp4(filename: string): Promise<Video> {
+      const draft = await service.createDraft(owner.id, {
+        ...INPUT,
+        filename,
+      });
+      await videoRepository.update(
+        { id: draft.id },
+        { processing_status: VideoProcessingStatus.READY },
+      );
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: bucketConfig.bucket,
+          Key: `videos/${draft.public_id}/video.mp4`,
+          Body: Buffer.alloc(4096, 7),
+          ContentType: 'video/mp4',
+        }),
+      );
+      return draft;
+    }
+
+    it('should issue a streamUrl that the storage serves with HTTP Range (206)', async () => {
+      const video = await readyVideoWithMp4('My Trip.mov');
+
+      const { streamUrl } = await service.getMediaUrls(
+        owner.id,
+        video.public_id,
+      );
+      const response = await fetchViaInternalEndpoint(streamUrl, bucketConfig, {
+        headers: { range: 'bytes=0-1023' },
+      });
+
+      expect(response.status).toBe(206);
+      expect(response.headers['content-range']).toMatch(/^bytes 0-1023\//);
+      expect(response.text).toHaveLength(1024);
+    });
+
+    it('should issue a downloadUrl that forces an .mp4 attachment named after the original file', async () => {
+      const video = await readyVideoWithMp4('My Trip.mov');
+
+      const { downloadUrl } = await service.getMediaUrls(
+        owner.id,
+        video.public_id,
+      );
+      const response = await fetchViaInternalEndpoint(
+        downloadUrl,
+        bucketConfig,
+      );
+
+      expect(response.status).toBe(200);
+      const disposition = response.headers['content-disposition'];
+      expect(disposition).toContain('attachment');
+      expect(disposition).toContain('filename="My Trip.mp4"');
+    });
+
+    it('should expire the URLs about 4 hours from now by default', async () => {
+      const video = await readyVideoWithMp4('clip.mp4');
+
+      const { expiresAt } = await service.getMediaUrls(
+        owner.id,
+        video.public_id,
+      );
+
+      const expectedMs = Date.now() + 4 * 60 * 60 * 1000;
+      expect(Math.abs(new Date(expiresAt).getTime() - expectedMs)).toBeLessThan(
+        60_000,
+      );
     });
   });
 });
