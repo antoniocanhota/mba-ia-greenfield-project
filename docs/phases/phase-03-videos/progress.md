@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 1/44 completed
+**SIs:** 2/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -11,9 +11,11 @@
   - Ação 2 ("Commitar `components/ui/progress.tsx`") não executada — operações git ficam com o usuário.
 
 ### SI-03.0.2 — Tests shadcn batch (progress)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 4 passing
+- **Observations:**
+  - O `progress.tsx` gerado pelo shadcn (SI-03.0.1) desestruturava `value` sem repassá-lo ao `ProgressPrimitive.Root`, então o Radix tratava a barra como indeterminada e não expunha `aria-valuenow`. Corrigido com `value={value}` no Root (aprovado pelo usuário), o que satisfaz o critério de aceite `aria-valuenow="84"`.
+  - O testing-guide-next-frontend § "UI Primitives" diz para não testar primitives shadcn; o plano exige este teste explicitamente (precedentes: `checkbox.test.tsx`, `icon-button.test.tsx`). Seguido o plano.
 
 ### SI-03.0.3 — Custom-ui: section-header.tsx
 - **Status:** pending
