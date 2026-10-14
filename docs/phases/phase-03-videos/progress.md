@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 34/45 completed
+**SIs:** 35/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -318,9 +318,12 @@
   - Respostas não-OK diferentes de 401 (ex.: 5xx) e falhas de rede não interrompem o polling: o hook reagenda e tenta de novo. O plano só define parada em `ready`/`failed` e em 401.
 
 ### SI-03.28 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 21 passing (`lib/videos/__tests__/format.test.ts`); `tsc --noEmit` exit 0; eslint em `lib/videos` 0 problemas
+- **Observations:**
+  - Copy de status e de `failureReason` escrita em inglês (idioma da UI e do Figma), inferida no implement conforme OQ-3; textos a revisar com o designer. "Envio interrompido" (PT) citado pelo plano não está aqui, pois é estado da tela, não de `processingStatus`.
+  - Limiares de `qualityLabel` (lado menor): ≥2160 "4K", ≥1440 "1440p", ≥1080 "1080p HD", ≥720 "720p HD", abaixo disso `{n}p`. O plano só fixa 1080 e 4K; 1440p e os demais são escolha de implementação.
+  - `Record<VideoProcessingStatus|VideoFailureReason, string>` já garante cobertura de copy em compilação; o teste só confere que nenhuma é vazia.
 
 ### SI-03.29 — Layout de `/studio` (auth gate, SideNav e provider de upload)
 - **Status:** pending
