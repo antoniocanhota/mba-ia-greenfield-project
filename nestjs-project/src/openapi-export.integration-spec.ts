@@ -128,4 +128,83 @@ describe('exportSpec (integration)', () => {
       }
     }
   });
+
+  describe('videos endpoints', () => {
+    type Operation = { responses: Record<string, Record<string, unknown>> };
+    const API_ERROR_REF = '#/components/schemas/ApiErrorEnvelope';
+    const EXPECTED: [string, string, string[]][] = [
+      ['/videos', 'post', ['201', '400', '401']],
+      ['/videos/{publicId}', 'get', ['200', '401', '404']],
+      [
+        '/videos/{publicId}/upload-signatures',
+        'post',
+        ['201', '400', '401', '404', '409'],
+      ],
+      [
+        '/videos/{publicId}/upload-completion',
+        'post',
+        ['200', '401', '404', '409', '422'],
+      ],
+      ['/videos/{publicId}/media-urls', 'get', ['200', '401', '404', '409']],
+    ];
+    const operation = (path: string, method: string): Operation => {
+      const paths = document.paths as Record<string, Record<string, Operation>>;
+      return paths[path][method];
+    };
+
+    it.each(EXPECTED)(
+      'documents %s %s with its response statuses',
+      (path, method, statuses) => {
+        expect(Object.keys(operation(path, method).responses).sort()).toEqual(
+          statuses,
+        );
+      },
+    );
+
+    it.each(EXPECTED)(
+      'references ApiErrorEnvelope in every error response of %s %s',
+      (path, method, statuses) => {
+        const { responses } = operation(path, method);
+        const errors = statuses.filter((status) => Number(status) >= 400);
+
+        for (const status of errors) {
+          const content = responses[status].content as Record<
+            string,
+            { schema: { $ref: string } }
+          >;
+          expect(content['application/json'].schema.$ref).toBe(API_ERROR_REF);
+        }
+      },
+    );
+
+    it('requires the access-token on every videos endpoint', () => {
+      for (const [path, method] of EXPECTED) {
+        const security = (
+          operation(path, method) as unknown as {
+            security: Record<string, unknown>[];
+          }
+        ).security;
+        expect(security.some((req) => 'access-token' in req)).toBe(true);
+      }
+    });
+
+    it('exposes the VideoResponseDto schema with the wire-format fields', () => {
+      const schemas = (
+        document.components as {
+          schemas: Record<string, { properties: Record<string, unknown> }>;
+        }
+      ).schemas;
+
+      expect(Object.keys(schemas['VideoResponseDto'].properties)).toEqual(
+        expect.arrayContaining([
+          'publicId',
+          'processingStatus',
+          'publicationStatus',
+          'failureReason',
+          'durationMs',
+          'thumbnailUrl',
+        ]),
+      );
+    });
+  });
 });

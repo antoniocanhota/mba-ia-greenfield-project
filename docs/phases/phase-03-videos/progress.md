@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 20/44 completed
+**SIs:** 21/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -197,9 +197,14 @@
   - O worker ficou ligado ao final; para rodar o e2e é preciso pará-lo (ver observação do SI-03.13).
 
 ### SI-03.15 — Export e sync do contrato OpenAPI para o frontend
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 12 new passing em `openapi-export.integration-spec.ts` (21 no arquivo); suite unit/integration 351 passing (`--runInBand`, worker parado); e2e 79 passing; `tsc --noEmit` exit 0 no backend e no `next-frontend`
+- **Observations:**
+  - **Corpos de requisição de vídeos saem vazios no contrato:** `CreateVideoDto` e `SignUploadRequestDto` têm `properties` vazio em `openapi.json` (e, portanto, `Record<string, never>` em `types.gen.ts`). Mesma limitação já existente nos DTOs de auth: `openapi:export` roda por `ts-node`, sem o plugin do `@nestjs/swagger` (que só atua no `nest build`), e esses DTOs não têm `@ApiProperty` explícito; `src/metadata.ts` é só um stub. As respostas (`VideoResponseDto`, `SignUploadResponseDto`, `MediaUrlsResponseDto`) saem completas porque têm `@ApiProperty`. Impacto: os aliases `CreateVideoDto`/`SignUploadRequestDto` do SI-03.16 e os handlers BFF dos SI-03.20/22 não terão tipagem dos campos do corpo vindo do contrato. Correção sugerida como tarefa separada: `@ApiProperty` nos DTOs de entrada ou aplicar o plugin no export.
+  - **`next-frontend/openapi.json` não é commitado:** está no `.gitignore` do `next-frontend` (linha 42); o plano pedia commitar. É uma cópia local gerada por `scripts/sync-openapi.sh` (idêntica à do backend, verificada com `cmp`); só `nestjs-project/openapi.json` e `next-frontend/lib/api/types.gen.ts` entram no commit.
+  - `types.gen.ts` expõe os cinco paths (`/videos`, `/videos/{publicId}`, `…/upload-signatures`, `…/upload-completion`, `…/media-urls`); `npx tsc --noEmit` no container do frontend sai com 0.
+  - Os testes novos conferem status documentados por operação, `ApiErrorEnvelope` em todo erro 4xx, `access-token` em todas as rotas de vídeos e os campos do `VideoResponseDto`.
+  - O `video-worker` foi parado para a suíte e religado ao final.
 
 ### SI-03.16 — Aliases de contrato de vídeos em `lib/api/contracts.ts`
 - **Status:** pending
