@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 26/44 completed
+**SIs:** 27/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -256,9 +256,13 @@
   - O handler é fino: toda a regra de sessão/refresh/pass-through está em `callAuthorizedUpstream`; os próximos handlers (SI-03.21 a 24) seguem o mesmo molde.
 
 ### SI-03.21 — BFF Route Handler: GET /api/videos/{publicId}
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5 new passing (`app/api/videos/[publicId]/__tests__/route.integration.test.ts`); vitest completo 140 passing (33 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - `params` tipado como `Promise<{ publicId: string }>` e confirmado em `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md` (Next 16).
+  - `Cache-Control: no-store` é aplicado a toda resposta do handler, inclusive aos pass-throughs de erro (404/409) e ao 401 sem sessão, não só ao 200; o plano cita só o 200. Para polling, uma resposta de erro em cache seria igualmente indesejada.
+  - O `publicId` vai ao upstream via `params.path` do `openapi-fetch` (codificado pelo client); o teste confere o path e o Bearer recebidos.
+  - O `publicId` não é validado no BFF: formato inválido chega ao upstream, que responde `404 VIDEO_NOT_FOUND` (comportamento do backend, SI-03.7).
 
 ### SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
 - **Status:** pending
