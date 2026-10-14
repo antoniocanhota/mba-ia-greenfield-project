@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 31/45 completed
+**SIs:** 32/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -364,6 +364,10 @@
 - **Observations:** none
 
 ### SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** Appended by /plan-build append-mode on 2026-10-14; tracks delta from phase-03-videos/TD-05 Revision 2026-10-14. Executar antes de SI-03.26.
+- **Status:** completed
+- **Tests:** no tests (Infra); `tsc --noEmit` exit 0; vitest 162 passing; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - Appended by /plan-build append-mode on 2026-10-14; tracks delta from phase-03-videos/TD-05 Revision 2026-10-14. Executar antes de SI-03.26.
+  - Instalado `@uppy/react@^6.0.0` (6.0.0) sem os peers opcionais (`dashboard`, `status-bar`, `webcam`, `screen-capture`) nem `golden-retriever`. `package.json` lista só `@uppy/core`, `@uppy/aws-s3` e `@uppy/react`; `npm ls @uppy/core` mostra uma única versão (6.2.0, deduped).
+  - **Dependências transitivas de `@uppy/*` no lockfile:** `@uppy/react` puxa `@uppy/components`, `@uppy/google-drive-picker` e `@uppy/google-photos-picker` (dependências de runtime dele, não declaradas no `package.json`). O critério "nenhum outro pacote `@uppy/*`" foi lido como sobre o `package.json`; os pickers do Google vêm junto de `@uppy/components` e não são importados pelo app.
+  - O lock também mudou +104/−2 linhas (preact, use-sync-external-store e afins). Ação 2 (commitar) não executada: git fica com o usuário.

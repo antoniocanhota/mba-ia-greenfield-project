@@ -17,6 +17,7 @@
     "@t3-oss/env-nextjs": "^0.13.11",
     "@uppy/aws-s3": "^6.2.2",
     "@uppy/core": "^6.2.0",
+    "@uppy/react": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "iron-session": "^8.0.4",
