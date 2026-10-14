@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { UploadIcon } from "@/components/icons/upload-icon"
 
 type UploadDropzoneProps = {
-  onFileSelected?: (file: File) => void
+  onFileSelected: (file: File) => void
   loading?: boolean
   error?: string | null
   className?: string
@@ -32,12 +32,12 @@ function UploadDropzone({
     setDragOver(false)
     if (loading) return
     const file = event.dataTransfer.files?.[0]
-    if (file) onFileSelected?.(file)
+    if (file) onFileSelected(file)
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (file) onFileSelected?.(file)
+    if (file) onFileSelected(file)
     event.target.value = ""
   }
 

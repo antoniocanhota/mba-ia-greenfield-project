@@ -355,8 +355,14 @@
 
 ### SI-03.30b — Tela de upload de vídeo (lógica & wiring)
 - **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Tests:** parcial — wiring unit 8 passing; E2E `studio-video-upload.e2e-spec.ts` 3/4 passing (1.2, 1.3, 2.1); `tsc --noEmit` e eslint exit 0
+- **Observations:**
+  - **Em aberto (decisão do usuário: seguir para SI-03.31.0 sem fechar o 30b):** o cenário 1.1 falha só na última asserção (`getByText("my-video.mp4")` em `/studio/videos/{publicId}`), porque a página da rota só existe no SI-03.31b. Reexecutar `npx playwright test tests/studio-video-upload.e2e-spec.ts` após o 31b e então marcar este SI como `completed`.
+  - Código/testes deste SI estão no working tree, não commitados: `components/studio/video-upload-dropzone.tsx`, `components/studio/__tests__/upload-dropzone.wiring.test.tsx`, `tests/studio-video-upload.e2e-spec.ts`, `app/studio/upload/page.tsx` (usa `VideoUploadDropzone`), `upload-dropzone.tsx` (`onFileSelected` voltou a ser obrigatório).
+  - A ligação ficou num componente novo (`VideoUploadDropzone`) e não dentro de `upload-dropzone.tsx`: `useUpload`/`useRouter` não podem ser condicionais e os testes presentacionais do dropzone renderizam sem provider.
+  - `CreateVideoDto` resolve para `Record<string, never>`; o payload usa o tipo local `CreateVideoRequest`.
+  - Nos E2E, `getByRole("alert")` precisa ser escopado à dropzone (o route announcer do Next também tem `role="alert"`).
+  - Dev server com `MSW_ENABLED=true` iniciado com log em `/tmp/dev.log` (container); o servidor que já rodava devolvia 500 no login do BFF até ser reiniciado.
 
 ### SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload em andamento
 - **Status:** pending
