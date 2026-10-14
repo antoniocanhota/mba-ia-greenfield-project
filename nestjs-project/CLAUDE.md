@@ -13,6 +13,8 @@ docker compose ps   # all services must show status "running"
 Then verify each infrastructure service is actually ready to accept connections — not just running:
 
 - **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+- **Redis:** `docker compose exec redis redis-cli ping` — expect `PONG`
+- **Object storage (RustFS):** `curl -fsS http://localhost:9000/health` — expect HTTP 200
 
 Only start the NestJS dev server (`npm run start:dev`) when the user **explicitly** asks to run the application — never as part of "start the environment".
 
@@ -33,6 +35,9 @@ docker compose exec nestjs-api npm run start:dev
 
 Services:
 - `nestjs-api` — NestJS API, port `3000`
+- `video-worker` — video processing worker (same image/codebase, `npm run start:worker:dev`), no published port
+- `storage` — S3-compatible object storage (RustFS), API port `9000`, console `9001`
+- `redis` — Redis 8, port `6379` (BullMQ backend)
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
 
 All verification and teardown commands run on the **host machine**:
@@ -46,6 +51,7 @@ docker compose exec db pg_isready -U streamtube
 
 # Check container logs
 docker compose logs nestjs-api
+docker compose logs video-worker
 docker compose logs db
 
 # Tear down the entire environment

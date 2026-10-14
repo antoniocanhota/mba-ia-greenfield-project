@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 16/44 completed
+**SIs:** 17/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -153,9 +153,14 @@
   - Os e2e gravam um `video.mp4` de 4 KiB no bucket de dev e o removem em `afterEach`.
 
 ### SI-03.11 — Entrypoint do worker e serviço `video-worker` no Compose
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 2 new passing (`worker.module.spec.ts` 1, `worker.module.integration-spec.ts` 1); suite unit/integration 276 passing (`--runInBand`); e2e 79 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - O teste de compilação do `WorkerModule` abre conexão real com db/Redis/storage, então foi para `worker.module.integration-spec.ts` (regra do CLAUDE.md do subprojeto); o `worker.module.spec.ts` do plano ficou só com a checagem de ausência de controllers via metadata.
+  - `npx jest` sem `--runInBand` falha de forma intermitente em suítes de integração diferentes a cada rodada (DB compartilhado, `cleanAllTables` concorrente); em série passam todas. Pré-existente, não relacionado a esta SI.
+  - O serviço `video-worker` sobe e loga `Video worker started` após inicializar TypeOrm, Bull e Storage; não publica portas. A API não é iniciada pelo Compose (só o container), então o `GET /` 200 foi coberto por `app.controller.spec.ts` e pelos e2e (79 passing) após a extração de `buildTypeOrmOptions`.
+  - `nestjs-project/CLAUDE.md` ganhou os serviços `video-worker`, `storage`, `redis` e as checagens `redis-cli ping` e `/health` do storage (RustFS, não MinIO — ver desvio do SI-03.1).
+  - A lista de tarefas persistente (TaskCreate) não está disponível neste ambiente; o progress file foi o único registro.
 
 ### SI-03.12 — Adapter FFmpeg (probe, normalização e thumbnail)
 - **Status:** pending
