@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 36/45 completed
+**SIs:** 37/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -334,9 +334,13 @@
   - Gate verificado só por tipos/lint; o comportamento de redirect será exercido pelos E2E das telas.
 
 ### SI-03.30.0 — Drift audit: Tela de upload de vídeo
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (audit-only)
+- **Observations:**
+  - A skill `figma:figma-implement-design` não está registrada nesta sessão; o audit usou `figma:figma-design-to-code` + `get_design_context` (mesmo handoff estreito, só leitura). SI-03.30a, 31a e 32a exigem a skill `figma:figma-implement-design` — se continuar indisponível, o fallback do `/implement` manda parar nelas.
+  - Resultado: 3 alinhado (Card, UploadIcon, Button), 3 drift relevante (SideNav, SideNavItem, UploadDropzone). O SVG de upload do Figma (48px, fill #0F0F0F) tem o mesmo path do `upload-icon.tsx` em escala; a cor diverge só no uso dentro da dropzone.
+  - Decisão a revisar: no SideNavItem a linha ativa do Figma usa `--card` (branco sobre fundo branco); o default retune `bg-muted → bg-card` deixa o item ativo sem destaque visível. Trocar para `exception` se preferir manter `bg-muted`. Nenhum item da SideNav fica ativo nesta fase (todos desabilitados).
+  - Altura da linha de 46px não tem token de spacing; o bullet usa `py-2.5` (44px) como aproximação.
 
 ### SI-03.30a — Tela de upload de vídeo (visual shell)
 - **Status:** pending
