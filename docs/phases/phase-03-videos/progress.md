@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 39/45 completed
+**SIs:** 40/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -375,9 +375,15 @@
   - AC `git diff --name-only HEAD -- next-frontend` vazio: este SI não alterou nada em `next-frontend`; o diff contém os arquivos não commitados do SI-03.30b (pendente).
 
 ### SI-03.31a — Tela do vídeo no studio — upload em andamento (visual shell)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (visual shell); `tsc --noEmit` exit 0; eslint em `app/studio`, `components/studio` 0 problemas; vitest de `components` 106 passing
+- **Observations:**
+  - `figma:figma-implement-design` indisponível; usada `figma:figma-design-to-code` com o contexto do SI-03.31.0 (sem nova chamada ao Figma), com a mesma autorização dada no SI-03.30a.
+  - Drift aplicado verbatim para os 9 componentes com decisão `auto-Edit`; `skip` em SideNav, SideNavItem e Card. Sem `exception`/`CONFLICT`. Fora da Reused DS list, por força dos bullets: `app/globals.css` (+`--color-progress-track`), `components/icons/copy-icon.tsx` (glifo novo), e criados `components/icons/play-icon.tsx` e `image-icon.tsx`.
+  - Os testes existentes de `video-details-card`, `video-player` etc. continuaram passando sem ajuste (nenhum dependia dos textos/estilos alterados).
+  - `video-player.tsx`: o raio do placeholder (`rounded-t-radius-2`) ficou só no estado placeholder; o `<video>` reproduzível manteve `radius-3`, pois o relatório só cobre o placeholder.
+  - `video-studio-view.tsx` é shell estático com valores de exemplo (84%, "Uploading", filename e link fixos); a página `app/studio/videos/[publicId]/page.tsx` ainda não lê o vídeo nem aplica ownership/404 — isso é do SI-03.31b. A rota agora existe, mas o E2E 1.1 do SI-03.30b só passa depois do 31b (a página precisa mostrar o nome do arquivo real).
+  - O heading "Details" do Figma não foi renderizado: pertence ao formulário de metadados, fora de escopo (OQ-1). Página não renderizada no navegador; fidelidade visual não conferida contra o screenshot.
 
 ### SI-03.31b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
 - **Status:** pending

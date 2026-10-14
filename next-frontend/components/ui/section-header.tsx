@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 const sectionHeaderVariants = cva("flex flex-col", {
   variants: {
     size: {
-      md: "gap-1 [&_[data-slot=section-header-title]]:text-h3 [&_[data-slot=section-header-title]]:text-foreground",
+      md: "gap-1 [&_[data-slot=section-header-title]]:text-h2 [&_[data-slot=section-header-title]]:text-foreground",
       lg: "gap-1.5 [&_[data-slot=section-header-title]]:text-h2 [&_[data-slot=section-header-title]]:text-foreground",
     },
   },

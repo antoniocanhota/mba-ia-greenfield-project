@@ -6,15 +6,17 @@ import { cn } from "@/lib/utils"
 type ThumbUploadProps = {
   thumbnailUrl?: string | null
   alt?: string
+  duration?: string | null
   className?: string
 }
 
 function ThumbUpload({
   thumbnailUrl,
   alt = "Video thumbnail",
+  duration,
   className,
 }: ThumbUploadProps) {
-  const base = "relative aspect-video w-full overflow-hidden rounded-[var(--radius-3)]"
+  const base = "relative aspect-video w-full overflow-hidden rounded-[var(--radius-4)]"
 
   if (!thumbnailUrl) {
     return (
@@ -42,6 +44,14 @@ function ThumbUpload({
         sizes="(min-width: 768px) 50vw, 100vw"
         className="object-cover"
       />
+      {duration ? (
+        <span
+          data-slot="thumb-upload-duration"
+          className="absolute bottom-2 right-2 rounded-[var(--radius-1)] bg-neutral-alpha-50 p-1 text-label-md text-neutral-100"
+        >
+          {duration}
+        </span>
+      ) : null}
     </div>
   )
 }

@@ -20,9 +20,18 @@ const EMPTY = "—"
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1 border-t border-border pt-2">
       <dt className="text-caption text-muted-foreground">{label}</dt>
-      <dd className="text-body-md text-foreground break-words">{value}</dd>
+      <dd className="text-caption text-muted-foreground break-words">{value}</dd>
+    </div>
+  )
+}
+
+function InlineDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+      <dt className="text-caption text-muted-foreground">{label}</dt>
+      <dd className="text-caption text-foreground break-words">{value}</dd>
     </div>
   )
 }
@@ -38,7 +47,10 @@ function VideoDetailsCard({
   className,
 }: VideoDetailsCardProps) {
   return (
-    <Card data-slot="video-details-card" className={cn(className)}>
+    <Card
+      data-slot="video-details-card"
+      className={cn("rounded-[var(--radius-3)]", className)}
+    >
       <CardContent className="flex flex-col gap-4">
         <VideoPlayer src={src} poster={poster} />
         <div className="flex flex-col gap-1">
@@ -56,7 +68,7 @@ function VideoDetailsCard({
         {downloadSlot ? <div>{downloadSlot}</div> : null}
         <dl className="flex flex-col gap-3">
           <DetailRow label="Filename" value={filename} />
-          <DetailRow label="Video quality" value={quality || EMPTY} />
+          <InlineDetailRow label="Video Quality" value={quality || EMPTY} />
           <DetailRow label="Duration" value={duration || EMPTY} />
         </dl>
       </CardContent>

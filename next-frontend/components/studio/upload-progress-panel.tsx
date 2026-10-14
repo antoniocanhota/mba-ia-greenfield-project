@@ -22,12 +22,12 @@ function UploadProgressPanel({
   return (
     <div
       data-slot="upload-progress-panel"
-      className={cn("flex flex-col gap-3", className)}
+      className={cn("flex flex-col gap-2 border-b border-border", className)}
     >
-      <div className="flex items-center gap-3">
-        <VideoFileIcon className="size-8 shrink-0 text-muted-foreground" />
+      <div className="flex items-start gap-2">
+        <VideoFileIcon className="size-6 shrink-0 text-foreground" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-label-md text-foreground">
+          <span className="truncate text-body-md text-foreground">
             {filename}
           </span>
           <span

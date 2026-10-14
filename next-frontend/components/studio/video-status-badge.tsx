@@ -10,7 +10,7 @@ function VideoStatusBadge({ copy, className, ...props }: VideoStatusBadgeProps) 
   return (
     <p
       data-slot="video-status-badge"
-      className={cn("text-label-md text-link", className)}
+      className={cn("text-caption text-link", className)}
       {...props}
     >
       {copy}

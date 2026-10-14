@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 function CopyIcon({ className, ...props }: React.ComponentProps<"svg">) {
   return (
     <svg
-      viewBox="0 -960 960 960"
+      viewBox="0 0 16 16"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
@@ -13,7 +13,7 @@ function CopyIcon({ className, ...props }: React.ComponentProps<"svg">) {
       {...props}
     >
       <path
-        d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Z"
+        d="M14 12H8C6.89688 12 6 11.1031 6 10V2C6 0.896875 6.89688 0 8 0H12.3781C12.775 0 13.1562 0.159375 13.4375 0.440625L15.5594 2.5625C15.8406 2.84375 16 3.225 16 3.62188V10C16 11.1031 15.1031 12 14 12ZM2 4H5V5.5H2C1.725 5.5 1.5 5.725 1.5 6V14C1.5 14.275 1.725 14.5 2 14.5H8C8.275 14.5 8.5 14.275 8.5 14V13H10V14C10 15.1031 9.10312 16 8 16H2C0.896875 16 0 15.1031 0 14V6C0 4.89688 0.896875 4 2 4Z"
         fill="currentColor"
       />
     </svg>

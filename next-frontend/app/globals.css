@@ -65,6 +65,7 @@
   --color-border: var(--border);
   --color-input-background: var(--input-background);
   --color-link: var(--link);
+  --color-progress-track: var(--progress-track);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
   --color-red-100: #ffd5d5;
