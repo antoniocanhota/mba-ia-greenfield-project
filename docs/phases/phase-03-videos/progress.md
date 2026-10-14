@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 38/45 completed
+**SIs:** 39/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -365,9 +365,14 @@
   - Dev server com `MSW_ENABLED=true` iniciado com log em `/tmp/dev.log` (container); o servidor que já rodava devolvia 500 no login do BFF até ser reiniciado.
 
 ### SI-03.31.0 — Drift audit: Tela do vídeo no studio — upload em andamento
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (audit-only)
+- **Observations:**
+  - Skill `figma:figma-implement-design` ainda indisponível; usada `figma:figma-design-to-code` + `get_design_context` (só leitura), como no SI-03.30.0.
+  - Resultado: 3 alinhado (SideNav, SideNavItem, Card — decisões do SI-03.30.0 honradas), 4 drift menor, 5 drift relevante, 0 ausente. Ícones do Figma comparados byte a byte com os de código: `video_file` (Figma é o contorno, código é o preenchido) e `copy` (glifo diferente) divergem; `play` e `image` do placeholder do player não existem.
+  - Para o SI-03.31a: o bullet do `ProgressLinear` exige registrar `--color-progress-track` no `@theme inline` de `app/globals.css` (o `--progress-track` bruto já existe); os bullets do `VideoPreview` criam `components/icons/play-icon.tsx` e `image-icon.tsx`; o do `CopyLinkButton` edita `components/icons/copy-icon.tsx`, fora da Reused DS list.
+  - A linha extra "Duration" do `VideoDetailsCard` (sem equivalente no Figma) foi mantida (OQ-10).
+  - AC `git diff --name-only HEAD -- next-frontend` vazio: este SI não alterou nada em `next-frontend`; o diff contém os arquivos não commitados do SI-03.30b (pendente).
 
 ### SI-03.31a — Tela do vídeo no studio — upload em andamento (visual shell)
 - **Status:** pending
