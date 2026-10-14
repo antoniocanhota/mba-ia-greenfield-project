@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 32/45 completed
+**SIs:** 33/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -299,9 +299,16 @@
   - Ação 2 (commitar) não executada nesta SI: git fica com o usuário.
 
 ### SI-03.26 — Provider de upload (Uppy headless) para o studio
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 24 new passing (`lib/studio/__tests__/create-uppy.test.ts` 11, `components/studio/__tests__/upload-provider.test.tsx` 13); vitest completo 186 passing (38 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - **O draft ativo vive no `meta` do Uppy, não numa ref:** o plano pede `createUppy({ getPublicId })`, mas `useState(() => createUppy({ getPublicId: () => ref.current }))` é barrado pelo lint do React Compiler ("Cannot access refs during render"). O provider chama `uppy.setMeta({ publicId })` em `start()` e o `getPublicId`, o `signRequest` e os handlers de evento leem `uppy.getState().meta.publicId`; `clear()` zera o meta. A assinatura pública de `createUppy` continua a do plano.
+  - **Contrato do provider:** `useUpload()` expõe `addFile(file)` (lança o erro de restrição do Uppy), `start(publicId)`, `clear()` e `getUpload(publicId)` → `{ fileName, progress, phase, error?, errorCode?, video? }`. O plano cita só `error?`; acrescentei `errorCode` (`UPLOAD_INCOMPLETE`, `FILE_TOO_LARGE`, `NETWORK_ERROR`, `UPLOAD_FAILED`, ou o código do envelope) separado da mensagem, para as telas mapearem erro por código.
+  - **`upload-completion` roda uma vez por rascunho** (guarda com `Set` em ref) e o `uppy.clear()` acontece no `finally` da conclusão, quer termine em `completed` ou em `error`, para liberar o Uppy para um novo envio. `upload-error` do Uppy vira `phase: "error"` (`UPLOAD_FAILED`); não há `retry` na API do provider (o plano não prevê); a tela decide entre `clear()` + novo arquivo.
+  - **Os testes dirigem o Uppy real:** o `Probe` pega a instância pelo `UppyContext` e emite `upload-progress`/`upload-success`/`upload-error`, com `uppy.upload` mockado (senão o plugin S3 tentaria rede) e `fetch` stubado com `vi.stubGlobal` (a rota `/api/videos/...` do BFF não tem handler MSW; o plano pede `fetch` stubado). As restrições (não-vídeo, >10 GiB, segundo arquivo) são exercitadas no Uppy real, usando `Object.defineProperty(file, "size", …)` para simular 10 GiB sem alocar.
+  - **Não verificado de ponta a ponta:** o `AwsS3` do Uppy 6 falando com o `routeStorageFake` (SI-03.19) e com a rota de assinatura só será exercitado nos E2E do SI-03.30b/31b. Em especial, a forma exata das URLs que o Uppy 6 deriva da `url` assinada para create/list/complete (o fake distingue operações por método + `uploadId` na query) precisa ser confirmada lá.
+  - A progressão de `progress` usa `bytesUploaded/bytesTotal` do evento `upload-progress` (arredondado e limitado a 0–100) e só atualiza enquanto `phase === "uploading"`, para um evento tardio não regredir um upload já em `completing`/`completed`.
+  - Usei apenas o Prettier nos arquivos criados (lição do SI-03.17).
 
 ### SI-03.27 — Hook de polling `useVideoStatus`
 - **Status:** pending
