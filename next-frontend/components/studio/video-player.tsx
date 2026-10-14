@@ -13,7 +13,8 @@ type VideoPlayerProps = {
 function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
   const base = "aspect-video w-full overflow-hidden bg-black"
 
-  if (!src) {
+  // A poster alone still gets the <video> (the thumbnail shows while the stream URL is fetched).
+  if (!src && !poster) {
     return (
       <div
         data-slot="video-player"
@@ -39,7 +40,7 @@ function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
       data-state="ready"
       controls
       preload="metadata"
-      src={src}
+      src={src ?? undefined}
       poster={poster ?? undefined}
       className={cn(base, "rounded-t-[var(--radius-2)]", className)}
     />

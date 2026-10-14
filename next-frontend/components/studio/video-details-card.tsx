@@ -12,6 +12,7 @@ type VideoDetailsCardProps = {
   duration?: string | null
   src?: string | null
   poster?: string | null
+  playerMessage?: string | null
   downloadSlot?: React.ReactNode
   className?: string
 }
@@ -43,6 +44,7 @@ function VideoDetailsCard({
   duration,
   src,
   poster,
+  playerMessage,
   downloadSlot,
   className,
 }: VideoDetailsCardProps) {
@@ -53,6 +55,11 @@ function VideoDetailsCard({
     >
       <CardContent className="flex flex-col gap-4">
         <VideoPlayer src={src} poster={poster} />
+        {playerMessage ? (
+          <p role="alert" className="text-caption text-destructive-text">
+            {playerMessage}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-1">
           <span className="text-caption text-muted-foreground">Video link</span>
           <div className="flex items-center gap-2">

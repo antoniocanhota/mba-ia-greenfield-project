@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 44/45 completed
+**SIs:** 45/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -420,9 +420,15 @@
   - Página não renderizada no navegador; fidelidade visual não conferida contra o screenshot.
 
 ### SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** unit `video-studio-view.ready.test.tsx` 6 passing; E2E `studio-video-ready.e2e-spec.ts` 4 passing (spec-derived, `next-frontend/specs/video-ready.plan.md`); as 3 specs de vídeo juntas (15 testes) passaram em 3 execuções consecutivas; `components/studio` 63 passing; `tsc --noEmit` exit 0; eslint 0 erros (1 warning pré-existente)
+- **Observations:**
+  - `video-studio-view` busca `GET /api/videos/{publicId}/media-urls` uma vez quando o status é `ready` (no carregamento ou quando o polling chega lá); `401` → redirect `/login`; qualquer outra falha (inclui `409 VIDEO_NOT_READY` e erro de rede) → player sem `src` com a mensagem "The video could not be loaded." (`role="alert"`) e Download desabilitado. O efeito depende de `router`, que no app é estável (o mock dos testes também).
+  - Download: com URLs, `Button asChild` + `<a href={downloadUrl}>` (link, não botão); sem URLs, `<Button disabled>`.
+  - Mudanças em arquivos de DS fora do 32a: `video-player.tsx` passou a renderizar o `<video controls>` também quando só há `poster` (poster aparece enquanto a `streamUrl` chega; sem `src` nem `poster` continua o placeholder) e `video-details-card.tsx` ganhou a prop `playerMessage`. Esses dois arquivos usam o estilo sem ponto e vírgula do bootstrap; não foram reformatados.
+  - O E2E 1.2 confere o estado desabilitado inicial no HTML renderizado no servidor (`page.request.get`), porque `/api/**` não pode ser interceptado para atrasar a resposta; as expectativas de metadados vêm de `buildVideo` com os mesmos valores do handler de `readyVid001`, e `src`/`href` vêm da resposta observada de `media-urls`.
+  - A reprodução com Range e o download com `.mp4` (AC 2 e 3) dependem do storage real e já são cobertos no backend (`videos-media-urls`); no E2E o storage é o fake.
+  - Infra de E2E: o dev server voltou a perder o MSW (500 no login do BFF) mesmo com `.next` limpo; só `docker compose restart next-frontend` (matando processos `next` órfãos de execuções anteriores) resolveu.
 
 ### SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
 - **Status:** completed

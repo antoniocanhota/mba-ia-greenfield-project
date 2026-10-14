@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { useVideoStatus } from "@/hooks/use-video-status";
-import type { VideoResponse } from "@/lib/api/contracts";
+import type { MediaUrlsResponse, VideoResponse } from "@/lib/api/contracts";
 import {
   failureReasonCopy,
   formatDuration,
@@ -23,6 +23,9 @@ import {
   publicVideoUrl,
   qualityLabel,
 } from "@/lib/videos/format";
+
+type MediaState =
+  { status: "ready"; urls: MediaUrlsResponse } | { status: "error" };
 
 const noopSubscribe = () => () => {};
 
@@ -108,6 +111,35 @@ export function VideoStudioView({
     };
   }, [errorCode, publicId, router, setVideo]);
 
+  // Media URLs are fetched once, when the video is (or becomes) ready; undefined = loading.
+  const ready = video.processingStatus === "ready";
+  const [media, setMedia] = useState<MediaState | undefined>();
+  useEffect(() => {
+    if (!ready) return;
+
+    let cancelled = false;
+    void fetch(`/api/videos/${publicId}/media-urls`, { cache: "no-store" })
+      .then(async (response) => {
+        if (cancelled) return;
+        if (response.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!response.ok) {
+          setMedia({ status: "error" });
+          return;
+        }
+        const urls = (await response.json()) as MediaUrlsResponse;
+        if (!cancelled) setMedia({ status: "ready", urls });
+      })
+      .catch(() => {
+        if (!cancelled) setMedia({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, publicId, router]);
+
   const origin = useSyncExternalStore(
     noopSubscribe,
     () => window.location.origin,
@@ -136,7 +168,6 @@ export function VideoStudioView({
     (upload?.phase === "uploading" || upload?.phase === "completing");
   const uploadFailed = awaiting && upload?.phase === "error";
   const interrupted = awaiting && !upload;
-  const ready = video.processingStatus === "ready";
   const inProgress = video.processingStatus !== "awaiting_upload" && !ready;
 
   const filename = upload?.fileName || video.filename;
@@ -219,12 +250,30 @@ export function VideoStudioView({
             filename={video.filename}
             quality={qualityLabel(video.width, video.height)}
             duration={formatDuration(video.durationMs)}
+            src={
+              ready && media?.status === "ready" ? media.urls.streamUrl : null
+            }
+            poster={video.thumbnailUrl}
+            playerMessage={
+              ready && media?.status === "error"
+                ? "The video could not be loaded."
+                : null
+            }
             downloadSlot={
               ready ? (
-                <Button type="button" variant="secondary" disabled>
-                  <DownloadIcon aria-hidden="true" />
-                  Download
-                </Button>
+                media?.status === "ready" ? (
+                  <Button asChild variant="secondary">
+                    <a href={media.urls.downloadUrl}>
+                      <DownloadIcon aria-hidden="true" />
+                      Download
+                    </a>
+                  </Button>
+                ) : (
+                  <Button type="button" variant="secondary" disabled>
+                    <DownloadIcon aria-hidden="true" />
+                    Download
+                  </Button>
+                )
               ) : undefined
             }
           />
