@@ -7,6 +7,8 @@ import { StorageModule } from '../storage/storage.module';
 import { UsersModule } from '../users/users.module';
 import { Video } from '../videos/entities/video.entity';
 import { VideoProcessingService } from './video-processing.service';
+import { VideoSweepScheduler } from './video-sweep.scheduler';
+import { VideoSweepService } from './video-sweep.service';
 import { VideoProcessor } from './video.processor';
 
 // Worker-only: importing this module in the API would make it consume the queue.
@@ -21,6 +23,11 @@ import { VideoProcessor } from './video.processor';
     StorageModule,
     QueueModule,
   ],
-  providers: [VideoProcessingService, VideoProcessor],
+  providers: [
+    VideoProcessingService,
+    VideoSweepService,
+    VideoSweepScheduler,
+    VideoProcessor,
+  ],
 })
 export class VideoProcessingModule {}

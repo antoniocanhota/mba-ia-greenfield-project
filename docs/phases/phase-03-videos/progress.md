@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 19/44 completed
+**SIs:** 20/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -185,9 +185,16 @@
   - Erro de probe 2 / upload com falha transitória deixa o vídeo em `processing`, e o retry reentra pelo guard (aceita `processing`).
 
 ### SI-03.14 — Scheduler e processor `sweep-videos`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 11 new passing (`video-sweep.service.integration-spec.ts` 7, `video-sweep.scheduler.integration-spec.ts` 1, +3 em `video.processor.spec.ts`); suite unit/integration 339 passing (`--runInBand`, worker parado); e2e 79 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - **Verificado no worker real:** após subir e reiniciar o `video-worker`, o Redis tem um único job scheduler `sweep-videos` (`every: 900000`, `iterationCount: 2`), ou seja, o sweep já executou sem erro e o reinício não duplicou o agendamento.
+  - **Corrida com `upload-completion`:** `markAbandonedUploads` usa `UPDATE ... WHERE processing_status = 'awaiting_upload' AND created_at < cutoff ... RETURNING public_id`, a mesma guarda condicional do completion, então só um dos dois vence. O teste cobre o lado determinístico (vídeo `uploaded` com 30h nunca vira `upload_abandoned`); a corrida em si é garantida pelo Postgres, não por um teste concorrente.
+  - O abort de multiparts só atua na key exata do rascunho (o `ListMultipartUploads` filtra por prefixo; o teste cria uma key irmã `...original-other` e confirma que ela sobrevive). Falha do storage no abort é logada e não impede a varredura dos demais vídeos (backstop: lifecycle rule do bucket).
+  - `requeueStrandedUploads` depende de `jobId = videoId` e de os jobs `process-video` não terem `removeOnComplete`/`removeOnFail` (hoje não têm); se isso mudar, o re-add deixa de ser ignorado e o sweep passaria a reprocessar vídeos já tratados. O guard de idempotência do `VideoProcessingService` continua protegendo vídeos `ready`/`failed`.
+  - Constantes `SWEEP_SCHEDULER_ID` e `SWEEP_INTERVAL_MS` em `queue.constants.ts`. O plano fala em `VideoSweepProcessor`; seguindo a ação 3 (um único `WorkerHost` por fila), o roteamento ficou no `VideoProcessor`.
+  - Os dois sweeps rodam em sequência no mesmo job e compartilham o mesmo `now`; erro no primeiro faz o job falhar sem rodar o segundo (sem retry configurado para o sweep; roda de novo em 15 min).
+  - O worker ficou ligado ao final; para rodar o e2e é preciso pará-lo (ver observação do SI-03.13).
 
 ### SI-03.15 — Export e sync do contrato OpenAPI para o frontend
 - **Status:** pending

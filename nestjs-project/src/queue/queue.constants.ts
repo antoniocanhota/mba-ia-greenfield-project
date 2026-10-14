@@ -7,3 +7,7 @@ export const PROCESS_VIDEO_JOB_OPTIONS = {
   attempts: 3,
   backoff: { type: 'exponential', delay: 5000 },
 } as const;
+
+// One repeatable scheduler (upserted by ID at worker boot) triggers the sweep job.
+export const SWEEP_SCHEDULER_ID = 'sweep-videos';
+export const SWEEP_INTERVAL_MS = 15 * 60 * 1000;

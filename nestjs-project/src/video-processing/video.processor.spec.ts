@@ -1,6 +1,7 @@
 import type { Job } from 'bullmq';
 import { PROCESS_VIDEO_JOB, SWEEP_VIDEOS_JOB } from '../queue/queue.constants';
 import { VideoProcessingService } from './video-processing.service';
+import type { VideoSweepService } from './video-sweep.service';
 import { VideoProcessor } from './video.processor';
 
 const jobOf = (
@@ -18,12 +19,21 @@ const jobOf = (
 
 describe('VideoProcessor', () => {
   let processing: { process: jest.Mock };
+  let sweep: {
+    markAbandonedUploads: jest.Mock;
+    requeueStrandedUploads: jest.Mock;
+  };
   let processor: VideoProcessor;
 
   beforeEach(() => {
     processing = { process: jest.fn().mockResolvedValue(undefined) };
+    sweep = {
+      markAbandonedUploads: jest.fn().mockResolvedValue(0),
+      requeueStrandedUploads: jest.fn().mockResolvedValue(0),
+    };
     processor = new VideoProcessor(
       processing as unknown as VideoProcessingService,
+      sweep as unknown as VideoSweepService,
     );
   });
 
@@ -71,9 +81,21 @@ describe('VideoProcessor', () => {
     expect(updateProgress).toHaveBeenCalledWith(40);
   });
 
-  it('should ignore job kinds other than process-video', async () => {
+  it('should route sweep-videos jobs to both sweeps with the same instant', async () => {
     await processor.process(jobOf(SWEEP_VIDEOS_JOB, 0));
 
     expect(processing.process).not.toHaveBeenCalled();
+    expect(sweep.markAbandonedUploads).toHaveBeenCalledTimes(1);
+    expect(sweep.requeueStrandedUploads).toHaveBeenCalledTimes(1);
+    const [[abandonedAt]] = sweep.markAbandonedUploads.mock.calls as [Date][];
+    const [[requeuedAt]] = sweep.requeueStrandedUploads.mock.calls as [Date][];
+    expect(abandonedAt).toBe(requeuedAt);
+  });
+
+  it('should ignore unknown job kinds', async () => {
+    await processor.process(jobOf('something-else', 0));
+
+    expect(processing.process).not.toHaveBeenCalled();
+    expect(sweep.markAbandonedUploads).not.toHaveBeenCalled();
   });
 });
