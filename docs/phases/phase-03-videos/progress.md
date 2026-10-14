@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 29/44 completed
+**SIs:** 30/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -281,9 +281,13 @@
   - Os erros `409 UPLOAD_INCOMPLETE`, `409 INVALID_VIDEO_STATE`, `422 FILE_TOO_LARGE` e `404` são simulados com `server.use(...)`: o handler MSW de `upload-completion` (SI-03.18) só produz 200, 404 (`missingVid1`) e 409 `INVALID_VIDEO_STATE` (`failedVid01`).
 
 ### SI-03.24 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5 new passing (`app/api/videos/[publicId]/media-urls/__tests__/route.integration.test.ts`); vitest completo 162 passing (36 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - `Cache-Control: no-store` em toda resposta do handler (inclui os erros 409/404 e o 401), como no `GET /api/videos/{publicId}`; as URLs pré-assinadas expiram, então cache seria perigoso.
+  - Os testes usam os triggers do SI-03.18: `readyVid001` → 200 com URLs na origem `E2E_STORAGE_ORIGIN` (`response-content-disposition=attachment` no `downloadUrl`, `expiresAt` parseável); `procVid0001` → 409 `VIDEO_NOT_READY`; `missingVid1` → 404.
+  - O BFF não valida nem reescreve as URLs: a origem real do storage (browser-reachable) vem do upstream (`S3_PUBLIC_ENDPOINT`), então `next.config` / CSP de mídia precisam permitir esse host quando o player for ligado (SI-03.32b); fora de escopo aqui.
+  - Com isso os cinco Route Handlers BFF de vídeos (SI-03.20 a 24) estão prontos. Commit: o usuário pediu para não commitar esta SI.
 
 ### SI-03.25 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
 - **Status:** pending
