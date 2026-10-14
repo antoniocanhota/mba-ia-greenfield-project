@@ -24,13 +24,17 @@ libs:
     version: "^6.2.2"
     context7_id: "/websites/uppy_io"
     fetched_at: "2026-10-07T14:44:00-03:00"
+  "@uppy/react":
+    version: "^6.0.0"
+    context7_id: "/websites/uppy_io"
+    fetched_at: "2026-10-14T09:50:37-03:00"
   fluent-ffmpeg:
     version: "^2.1.3"
     context7_id: "/fluent-ffmpeg/node-fluent-ffmpeg"
     fetched_at: "2026-10-07T14:44:00-03:00"
 sources_mtime:
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-07T15:18:52-03:00"
-  docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-14T09:18:25-03:00"
+  docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
 ---
 
 # phase-03-videos — Library References
@@ -175,12 +179,43 @@ uppy.use(AwsS3, {
 
 ### React (headless) provider (OQ-6: provider in the `/studio` layout)
 
+The provider uses `@uppy/react`, adopted by the 2026-10-14 TD-05 revision. See the `@uppy/react` section below.
+
+## @uppy/react
+
+**Source:** `/websites/uppy_io` (Context7), High reputation, Uppy 6. Maps to `phase-03-videos/TD-05` (revision 2026-10-14). Latest 6.x on npm: `6.0.0`. Peers: `@uppy/core ^6.0.0`, `react`/`react-dom` `^18 || ^19`. `@uppy/dashboard`, `@uppy/status-bar`, `@uppy/webcam` and `@uppy/screen-capture` are optional peers and stay uninstalled. Runtime deps pulled in: `@uppy/components`, `preact`, `use-sync-external-store`.
+
+### `UppyContextProvider` (provider in the `/studio` layout)
+
 ```tsx
-const [uppy] = useState(() => new Uppy());
+"use client";
+import { UppyContextProvider } from "@uppy/react";
+import { useState } from "react";
+
+const [uppy] = useState(() => createUppy(/* ... */)); // initializer: never recreate the instance
 return <UppyContextProvider uppy={uppy}>{children}</UppyContextProvider>;
 ```
 
-`UppyContextProvider` / `UppyContext` come from **`@uppy/react`**, which is not yet in TD-05's `**Libraries:**`. Add it via a TD-05 revision or `/decide` if the headless React hooks are used rather than a hand-rolled context.
+- Context value (`useContext(UppyContext)`): `{ uppy: Uppy | undefined; status: "init" | "ready" | "uploading" | "paused" | "error" | "complete"; progress: number }`.
+- `status`/`progress` are global to the instance. The per-`publicId` domain state (`phase: "uploading" | "completing" | "completed" | "error"`, the `video` returned by `upload-completion`) stays in the app's own provider layered on top (TD-05 revision).
+
+### `useUppyState` / `useUppyEvent`
+
+```tsx
+const files = useUppyState(uppy, (state) => state.files);
+const totalProgress = useUppyState(uppy, (state) => state.totalProgress);
+
+const [results, clearResults] = useUppyEvent(uppy, "upload-success"); // typed tuple of the event args
+useUppyEvent(uppy, "cancel-all", clearResults);
+```
+
+- `useUppyState(uppy, selector)` subscribes to the Uppy store reactively (selector-based, re-renders only when the selected slice changes).
+- `useUppyEvent(uppy, event, callback?)` returns `[results, clear]`, strongly typed per event.
+
+### Not used in this phase
+
+- `Dropzone` / `useDropzone` / `useFileInput`: file selection stays on the existing `UploadDropzone` (TD-05 revision).
+- `@uppy/react/dashboard` and the Uppy CSS: the UI is shadcn/Tailwind (headless use).
 
 ## fluent-ffmpeg
 

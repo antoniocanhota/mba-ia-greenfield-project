@@ -3,16 +3,16 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-13T14:12:07-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-07T15:20:25-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-08T08:04:12-03:00"
-  docs/decisions/technical-decisions-video-metadata.md: "2026-10-07T14:40:53-03:00"
-  docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:11:00-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-14T09:50:49-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-14T09:50:37-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-14T09:18:25-03:00"
+  docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
+  docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-09-28T14:55:47-03:00"
   docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-09-28T14:55:47-03:00"
-  docs/inventories/screen-inventory-phase-03-videos.md: "2026-10-06T13:51:35-03:00"
+  docs/inventories/screen-inventory-phase-03-videos.md: "2026-10-13T14:25:28-03:00"
 ---
 
 # Phase 03 — Upload e Processamento de Vídeos
@@ -915,7 +915,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 **Technical actions:**
 
 1. Criar `lib/studio/create-uppy.ts` — factory `createUppy({ getPublicId })`: `restrictions: { maxNumberOfFiles: 1, maxFileSize: 10 * 2 ** 30, allowedFileTypes: ["video/*"] }`; plugin `AwsS3` com `shouldUseMultipart: true`, `getChunkSize: (file) => Math.max(5 * 2 ** 20, Math.ceil(file.size / 10000))` (mínimo de 5 MiB do S3 e teto de 10000 partes), `limit: 6` e `signRequest` fazendo `POST /api/videos/{publicId}/upload-signatures` com `{ method, key, uploadId, partNumber }` e devolvendo `{ url, key? }` (per `phase-03-videos/TD-05`, `phase-03-videos/TD-04`; library-refs.md → @uppy/aws-s3; OQ-5).
-2. Criar `components/studio/upload-provider.tsx` (`"use client"`) — context hand-rolled (sem `@uppy/react`) com a instância criada via `useState(() => createUppy(...))`; API `addFile(file)` (aplica as restrições e lança o erro de restrição do Uppy), `start(publicId)`, `clear()` e `getUpload(publicId)` → `{ fileName, progress, phase: "uploading" | "completing" | "completed" | "error", error?, video? }` (per `phase-03-videos/TD-05`; OQ-6).
+2. Criar `components/studio/upload-provider.tsx` (`"use client"`) — instância criada via `useState(() => createUppy(...))` e compartilhada por `UppyContextProvider` de `@uppy/react`; o estado do Uppy (arquivos, progresso) é lido com `useUppyState` e os eventos com `useUppyEvent`, e o estado de domínio por `publicId` fica num contexto próprio do app por cima do `UppyContext`; API `addFile(file)` (aplica as restrições e lança o erro de restrição do Uppy), `start(publicId)`, `clear()` e `getUpload(publicId)` → `{ fileName, progress, phase: "uploading" | "completing" | "completed" | "error", error?, video? }` (per `phase-03-videos/TD-05`, revisão 2026-10-14; library-refs.md → @uppy/react; OQ-6).
 3. Em `upload-success`, chamar `POST /api/videos/{publicId}/upload-completion` e guardar o `VideoResponse` retornado em `getUpload(publicId).video`; erros `409 UPLOAD_INCOMPLETE` e `422 FILE_TOO_LARGE` viram `phase: "error"` com o `errorCode`; ao concluir, limpar o arquivo do Uppy para permitir um novo upload (per `phase-03-videos/TD-05`, `phase-03-videos/TD-02`).
 4. Expor `useUpload()` para os consumidores; o provider não persiste nada em `localStorage` (retomada só dentro da sessão do browser — `phase-03-videos/TD-04`, revisão 2026-10-07).
 
@@ -926,7 +926,7 @@ E2E do endpoint (fluxo HTTP, validação do DTO, 401) é autorado externamente p
 | `create-uppy.ts` | Unit per testing-guide-next-frontend § "Utilities" — chunk mínimo de 5 MiB e teto de 10000 partes; restrições rejeitam arquivo não-vídeo, acima de 10 GiB e segundo arquivo; `signRequest` envia o body esperado ao endpoint do `publicId` (`fetch` stubado) | `lib/studio/__tests__/create-uppy.test.ts` |
 | `upload-provider.tsx` | Unit per testing-guide-next-frontend § "Client Components" — eventos `upload-progress` atualizam `progress`; `upload-success` chama `upload-completion` e expõe o `video`; `422` vira `phase: "error"` com `FILE_TOO_LARGE` | `components/studio/__tests__/upload-provider.test.tsx` |
 
-**Dependencies:** SI-03.22, SI-03.23, SI-03.25
+**Dependencies:** SI-03.22, SI-03.23, SI-03.25, SI-03.33
 
 **Acceptance criteria:**
 
@@ -1283,6 +1283,27 @@ E2E da página (reprodução com `src` pré-assinado, download, estado `ready` v
 - Clicar em "Download" baixa o MP4 processado com nome terminado em `.mp4`.
 - Antes de as media URLs chegarem, ou se a busca falhar, o botão "Download" fica desabilitado.
 - A duração e a qualidade exibidas correspondem a `durationMs` e às dimensões de exibição do vídeo.
+
+---
+
+### SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
+
+**Description:** Adicionar `@uppy/react`, adotado pela revisão 2026-10-14 do TD-05, para o provider de upload do studio compartilhar a instância Uppy via `UppyContextProvider` e ler o estado com os hooks oficiais.
+
+**Technical actions:**
+
+1. Rodar `docker compose exec next-frontend npm install @uppy/react@^6.0.0` com a versão de library-refs.md — sem os peers opcionais `@uppy/dashboard`, `@uppy/status-bar`, `@uppy/webcam` e `@uppy/screen-capture`, e sem `@uppy/golden-retriever` (per `phase-03-videos/TD-05`, revisão 2026-10-14; library-refs.md → @uppy/react).
+2. Commitar `package.json` e `package-lock.json`.
+
+**Tests:** _(empty — Infra)_
+
+**Dependencies:** SI-03.25
+
+**Acceptance criteria:**
+
+- `next-frontend/package.json` lista `@uppy/core`, `@uppy/aws-s3` e `@uppy/react` na major 6 e nenhum outro pacote `@uppy/*`.
+- `docker compose exec next-frontend npm ls @uppy/core` mostra uma única versão de `@uppy/core` (deduped).
+- `docker compose exec next-frontend npx tsc --noEmit` sai com código 0 após a instalação.
 
 ---
 
@@ -1901,11 +1922,12 @@ SI-03.16 — depends on SI-03.15 (aliases derivados do `types.gen.ts` regenerado
 │   │   └── SI-03.27 — depends on SI-03.21 (polling usa a rota de leitura)
 │   ├── SI-03.22 — depends on SI-03.17, SI-03.18 (upload-signatures)
 │   ├── SI-03.23 — depends on SI-03.17, SI-03.18 (upload-completion)
-│   │   └── SI-03.26 — depends on SI-03.22, SI-03.23, SI-03.25 (provider assina partes e conclui o upload)
+│   │   └── SI-03.26 — depends on SI-03.22, SI-03.23, SI-03.25, SI-03.33 (provider assina partes e conclui o upload)
 │   │       └── SI-03.29 — depends on SI-03.0.4, SI-03.26 (layout compõe SideNav + provider)
 │   └── SI-03.24 — depends on SI-03.17, SI-03.18 (media-urls)
 └── SI-03.28 — depends on SI-03.16 (format usa os tipos derivados do contrato)
 SI-03.25 (root — infra: @uppy/core + @uppy/aws-s3)
+└── SI-03.33 — depends on SI-03.25 (amendment: instala @uppy/react, TD-05 revisão 2026-10-14)
 
 Bootstrap (next-frontend)
 
@@ -1931,7 +1953,7 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
     └── SI-03.32b — depends on SI-03.32a, SI-03.31b, SI-03.24, SI-03.28
 ```
 
-**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.25` a qualquer momento; frontend `SI-03.16 → SI-03.29` após `SI-03.15`; telas por último, na ordem `30 → 31 → 32`.
+**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.25` (+ amendment `SI-03.33`, antes de `SI-03.26`) a qualquer momento; frontend `SI-03.16 → SI-03.29` após `SI-03.15`; telas por último, na ordem `30 → 31 → 32`.
 
 ---
 
@@ -1981,6 +2003,7 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
 - [ ] SI-03.32.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
 - [ ] SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
 - [ ] SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
+- [ ] SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
 
 **Per-screen deliverables:**
 

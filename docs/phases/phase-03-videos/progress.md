@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 31/44 completed
+**SIs:** 31/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -362,3 +362,8 @@
 - **Status:** pending
 - **Tests:** —
 - **Observations:** none
+
+### SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
+- **Status:** pending
+- **Tests:** —
+- **Observations:** Appended by /plan-build append-mode on 2026-10-14; tracks delta from phase-03-videos/TD-05 Revision 2026-10-14. Executar antes de SI-03.26.

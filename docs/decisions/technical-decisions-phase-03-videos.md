@@ -188,7 +188,11 @@ _Subprojects in scope:_
 **Recommendation:** **Option A (Uppy 6 headless).** Resumable parallel multipart is exactly the hard, edge-case-heavy code Uppy exists to own. The `signRequest` model maps onto a single BFF route, which fits strict BFF, and the `HeadObject` verification the API needs anyway (TD-04 size cap) also covers the client-side completion trade-off.
 
 **Decision:** Option A (Uppy 6 headless)
-**Libraries:** @uppy/core, @uppy/aws-s3
+**Libraries:** @uppy/core, @uppy/aws-s3, @uppy/react
+
+**Revisions:**
+
+- 2026-10-14 — `@uppy/react` is adopted, as Option A's title already listed: the `/studio` upload provider shares the Uppy instance through `UppyContextProvider` and reads Uppy state via `useUppyState`/`useUppyEvent`. Per-`publicId` domain state (`phase`, the `video` returned by `upload-completion`) stays in the app's own provider layered on top. File selection keeps the existing `UploadDropzone` (no `@uppy/react` `Dropzone`/`useDropzone`); `@uppy/dashboard` and `@uppy/golden-retriever` stay out. _Rationale:_ `@uppy/react` dropped out of `**Libraries:**` when IC-4 was resolved, not by decision. The official hooks replace a hand-written store subscription, at the cost of `preact` and `@uppy/components` as transitive dependencies.
 
 ---
 
