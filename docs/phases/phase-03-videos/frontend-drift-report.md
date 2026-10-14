@@ -188,3 +188,83 @@ plan_mtime: "2026-10-14T09:54:41-0300"
   - +badge 'duration' at the bottom-right from Figma demand: bg-neutral-alpha-50, text-neutral-100, text-label-md, rounded-[var(--radius-1)], p-1
   - retune radius: base — rounded-[var(--radius-3)] → rounded-[var(--radius-4)]
 - **Prior:** _(none)_
+
+## Screen: video-ready — audited at SI-03.32.0 (2026-10-14)
+
+**Quick scan:** 7 alinhado · 1 drift menor · 1 drift relevante · 0 ausente
+
+- SideNav (`side-nav.tsx`) → `alinhado`
+- Card (`card.tsx`) → `alinhado`
+- CardVideoConfig (`video-details-card.tsx`) → `alinhado`
+- Video player (`video-player.tsx`) → `drift menor`
+- CopyLinkIcon (`copy-link-button.tsx`) → `alinhado`
+- SectionHeader (`section-header.tsx`) → `alinhado`
+- ThumbUpload (`thumb-upload.tsx`) → `alinhado`
+- ProcessingStatus (`processing-status.tsx`) → `drift relevante` (4 changes)
+- DownloadButton (`button.tsx`) → `alinhado`
+- DownloadIcon (`download-icon.tsx`) → `alinhado`
+
+### next-frontend/components/layout/side-nav.tsx — SideNav
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "auto-Edit (w-64, p-4, border-r, border-b, "You" in text-h3) at SI-03.30.0 honored"
+
+### next-frontend/components/ui/card.tsx — Card
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "skip at SI-03.30.0 honored"
+
+### next-frontend/components/studio/video-details-card.tsx — CardVideoConfig
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "auto-Edit (radius-3, border-t rows, inline Video Quality, caption filename) at SI-03.31.0 honored"
+
+### next-frontend/components/studio/video-player.tsx — Video player
+
+- **Status:** drift menor
+- **Decision:** `auto-Edit`
+  - retune radius: ready video — rounded-[var(--radius-3)] → rounded-t-[var(--radius-2)] (the Figma "Video" slot is the same container with only the top corners rounded; SI-03.31.0 only retuned the placeholder state)
+- **Prior:** "auto-Edit (placeholder radius, time label, play and image icons) at SI-03.31.0 honored for the placeholder state; the playable `<video>` state is new here"
+
+### next-frontend/components/studio/copy-link-button.tsx — CopyLinkIcon
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "auto-Edit (copy glyph) at SI-03.31.0 honored"
+
+### next-frontend/components/ui/section-header.tsx — SectionHeader
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "auto-Edit (md title text-h3 → text-h2) at SI-03.31.0 honored"
+
+### next-frontend/components/studio/thumb-upload.tsx — ThumbUpload
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "auto-Edit (+prop duration with badge, radius-4) at SI-03.31.0 honored"
+
+### next-frontend/components/studio/processing-status.tsx — ProcessingStatus
+
+- **Status:** drift relevante
+- **Decision:** `auto-Edit`
+  - +icon 'check_circle' from Figma demand (12×12 glyph, viewBox 0 0 12 12; new `components/icons/check-circle-icon.tsx`) used for the `ready` state instead of the shared stroke `CheckIcon`, which stays untouched for its other consumers
+  - retune size: ready icon — size-4 → size-3
+  - retune color: ready icon — inherited text-muted-foreground → text-success (`--success`, #1fc16b in the Figma asset)
+  - retune gap: base — gap-2 → gap-1
+- **Prior:** _(none)_
+
+### next-frontend/components/ui/button.tsx — DownloadButton
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** "skip at SI-03.30.0 honored" _(no Figma node for the download action — OQ-9: classified without visual diff; the Figma outline buttons "Change Thumbnail"/"Cancel" are out of scope, OQ-1)_
+
+### next-frontend/components/icons/download-icon.tsx — DownloadIcon
+
+- **Status:** alinhado
+- **Decision:** `skip`
+- **Prior:** _(none)_ _(no Figma node — OQ-9: classified without visual diff)_

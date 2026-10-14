@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 42/45 completed
+**SIs:** 43/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -400,9 +400,14 @@
   - Página não verificada visualmente no navegador contra o screenshot do Figma.
 
 ### SI-03.32.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (audit-only)
+- **Observations:**
+  - `figma:figma-implement-design` ainda indisponível; usada `figma:figma-design-to-code` + `get_design_context` (só leitura), como nos audits anteriores.
+  - Resultado: 7 alinhado, 1 drift menor, 1 drift relevante, 0 ausente; nenhuma divergência com a seção `video-uploading`, então não há `CONFLICT`. Os componentes compartilhados (SideNav, Card, CardVideoConfig, CopyLink, SectionHeader, ThumbUpload) estão `alinhado` com `Prior … honored`, pois os edits do SI-03.31a já estão no código.
+  - Drift novo: `VideoPlayer` no estado reproduzível (`<video>`) mantém raio `radius-3` enquanto o slot do Figma é `rounded-t-radius-2` (o 31.0 só tratou o placeholder); `ProcessingStatus` em `ready` usa o `CheckIcon` de traço, 16px e cinza, e o Figma pede um `check_circle` de 12px verde (`--success`), com gap de 4px — o bullet cria `components/icons/check-circle-icon.tsx` e não altera o `CheckIcon` compartilhado.
+  - DownloadButton e `download-icon.tsx` não têm node Figma (OQ-9): classificados `alinhado` sem diff visual. Os botões outline do Figma (Change Thumbnail, Cancel), o rodapé "Checks complete…" e o formulário de metadados continuam fora de escopo (OQ-1, OQ-3).
+  - AC `git diff --name-only HEAD -- next-frontend` vazio: este SI não alterou nada em `next-frontend` (a árvore estava limpa).
 
 ### SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
 - **Status:** pending
