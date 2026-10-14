@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 22/44 completed
+**SIs:** 23/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -215,9 +215,14 @@
   - `VideoProcessingStatus` (união de 5 valores) e `VideoFailureReason` (5 valores) são derivados de `VideoResponse`; `processing-status.tsx` (SI-03.0.5) ainda usa a união local `ProcessingStatusValue` e deve migrar para `VideoProcessingStatus` quando for tocado.
 
 ### SI-03.17 — Helper de chamada autenticada ao upstream (`lib/auth/authorized-upstream.ts`)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 7 new passing (`authorized-upstream.integration.test.ts`); vitest completo 115 passing (30 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente em `signup-form.tsx`)
+- **Observations:**
+  - **API do helper:** `callAuthorizedUpstream(call)` recebe `call(headers)` e devolve `NextResponse`; `AuthorizedHeaders` é um `type` (não `interface`) porque o `openapi-fetch` exige um tipo com index signature para `headers`. O resultado do `call` é tipado estruturalmente (`{ data?, error?, response }`), compatível com qualquer operação do client `upstream`.
+  - **Refresh em cima de `withRefresh`:** o helper reaproveita `withRefresh` (single-flight já existente) e relê `accessToken` da sessão a cada tentativa; como o `withRefresh` responde com um `Response` 401 próprio quando o refresh falha, o helper detecta isso (`final !== last.response`) e devolve o envelope `UNAUTHORIZED` do plano. O `withRefresh` não foi alterado.
+  - **Testes precisam importar o `upstream` dentro de `beforeAll`:** o `openapi-fetch` captura o `fetch` global na criação do client; um `await import` no topo do arquivo roda antes do `server.listen()` do `mocks/setup.ts` e as chamadas vão à rede real (`ENOTFOUND nestjs-api`). Mesmo padrão do teste de rota de login. Vale lembrar nos testes dos BFF handlers (SI-03.20 a 24).
+  - Sucesso sem corpo (204) devolve `NextResponse` com corpo nulo; erro sem corpo devolve `null` como JSON com o status do upstream. Nenhum endpoint de vídeos hoje retorna 204, então é só defensivo.
+  - **Armadilha:** `prettier --write lib/auth` reformatou 4 arquivos existentes (`refresh.ts`, `error-mapping.ts` e dois testes); revertidos com `git checkout`, só os dois arquivos novos ficam no diff. Usar `prettier --write` apenas nos arquivos criados.
 
 ### SI-03.18 — Handlers MSW de vídeos (`mocks/handlers/videos.ts`)
 - **Status:** pending
