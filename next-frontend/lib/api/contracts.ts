@@ -55,3 +55,28 @@ export type RefreshTokenPair =
 // Shared error envelope (all auth 4xx responses)
 export type ApiErrorEnvelope =
   paths["/auth/register"]["post"]["responses"][400]["content"]["application/json"];
+
+// ─── Videos ───────────────────────────────────────────────────────────────────
+
+// Request bodies. The upstream DTOs have no fields in the current openapi.json (the
+// export runs without the swagger plugin), so these resolve to an empty object type.
+export type CreateVideoDto =
+  paths["/videos"]["post"]["requestBody"]["content"]["application/json"];
+
+export type SignUploadRequestDto =
+  paths["/videos/{publicId}/upload-signatures"]["post"]["requestBody"]["content"]["application/json"];
+
+// Upstream success response bodies
+export type VideoResponse =
+  paths["/videos/{publicId}"]["get"]["responses"][200]["content"]["application/json"];
+
+export type SignUploadResponse =
+  paths["/videos/{publicId}/upload-signatures"]["post"]["responses"][201]["content"]["application/json"];
+
+export type MediaUrlsResponse =
+  paths["/videos/{publicId}/media-urls"]["get"]["responses"][200]["content"]["application/json"];
+
+// Derived from VideoResponse so the status/failure unions never drift from the contract.
+export type VideoProcessingStatus = VideoResponse["processingStatus"];
+
+export type VideoFailureReason = NonNullable<VideoResponse["failureReason"]>;

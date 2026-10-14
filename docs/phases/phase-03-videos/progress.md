@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 21/44 completed
+**SIs:** 22/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -207,9 +207,12 @@
   - O `video-worker` foi parado para a suíte e religado ao final.
 
 ### SI-03.16 — Aliases de contrato de vídeos em `lib/api/contracts.ts`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (type-only, compile-gated); `tsc --noEmit` exit 0, `eslint` limpo; suite vitest do frontend 108 passing (29 arquivos)
+- **Observations:**
+  - **Critério de aceite não literal:** `lib/api/upstream.ts` (anterior a esta SI) também faz `import type { paths } from "./types.gen"`, para tipar o client do `openapi-fetch`. Além dele e de `contracts.ts`, nenhum outro arquivo importa `types.gen`; `mocks/` ainda não importa. Não alterei o `upstream.ts` (fora de escopo).
+  - `CreateVideoDto` e `SignUploadRequestDto` resolvem para `Record<string, never>` (limitação de corpos de requisição vazios registrada em SI-03.15); o comentário no código registra isso. Quem for tipar o corpo de `POST /api/videos` e das assinaturas no BFF (SI-03.20/22) não terá os campos vindos do contrato.
+  - `VideoProcessingStatus` (união de 5 valores) e `VideoFailureReason` (5 valores) são derivados de `VideoResponse`; `processing-status.tsx` (SI-03.0.5) ainda usa a união local `ProcessingStatusValue` e deve migrar para `VideoProcessingStatus` quando for tocado.
 
 ### SI-03.17 — Helper de chamada autenticada ao upstream (`lib/auth/authorized-upstream.ts`)
 - **Status:** pending
