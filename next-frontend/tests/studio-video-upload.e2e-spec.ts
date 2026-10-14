@@ -71,8 +71,12 @@ test.describe("studio-video-upload", () => {
       page.getByRole("button", { name: "Select file" }),
     ).toBeDisabled();
 
-    await expect(page).toHaveURL(/\/studio\/videos\/[^/]+$/);
-    await expect(page.getByText("my-video.mp4")).toBeVisible();
+    // Client navigation to a dev-server RSC route can be slow under parallel workers.
+    await expect(page).toHaveURL(/\/studio\/videos\/[^/]+$/, {
+      timeout: 15_000,
+    });
+    // The name appears in the progress panel and in the details card.
+    await expect(page.getByText("my-video.mp4").first()).toBeVisible();
   });
 
   test("1.2 arquivo-nao-video-erro-inline-sem-bff", async ({ page }) => {

@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 40/45 completed
+**SIs:** 42/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -354,10 +354,10 @@
   - `prettier --check` acusa `upload-dropzone.tsx` (arquivo do bootstrap sem ponto e vírgula, estilo anterior); não reformatado para manter o diff restrito.
 
 ### SI-03.30b — Tela de upload de vídeo (lógica & wiring)
-- **Status:** pending
-- **Tests:** parcial — wiring unit 8 passing; E2E `studio-video-upload.e2e-spec.ts` 3/4 passing (1.2, 1.3, 2.1); `tsc --noEmit` e eslint exit 0
+- **Status:** completed
+- **Tests:** wiring unit 8 passing; E2E `studio-video-upload.e2e-spec.ts` 4/4 passing (rodado após o SI-03.31b); `tsc --noEmit` e eslint exit 0
 - **Observations:**
-  - **Em aberto (decisão do usuário: seguir para SI-03.31.0 sem fechar o 30b):** o cenário 1.1 falha só na última asserção (`getByText("my-video.mp4")` em `/studio/videos/{publicId}`), porque a página da rota só existe no SI-03.31b. Reexecutar `npx playwright test tests/studio-video-upload.e2e-spec.ts` após o 31b e então marcar este SI como `completed`.
+  - **Fechado no SI-03.31b:** o cenário 1.1 dependia da página `/studio/videos/{publicId}`; com o 31b passou a achar o nome do arquivo. O seletor virou `getByText("my-video.mp4").first()` (o nome aparece no painel e no card) e a espera do redirect ganhou 15s (navegação RSC em dev sob 4 workers).
   - Código/testes deste SI estão no working tree, não commitados: `components/studio/video-upload-dropzone.tsx`, `components/studio/__tests__/upload-dropzone.wiring.test.tsx`, `tests/studio-video-upload.e2e-spec.ts`, `app/studio/upload/page.tsx` (usa `VideoUploadDropzone`), `upload-dropzone.tsx` (`onFileSelected` voltou a ser obrigatório).
   - A ligação ficou num componente novo (`VideoUploadDropzone`) e não dentro de `upload-dropzone.tsx`: `useUpload`/`useRouter` não podem ser condicionais e os testes presentacionais do dropzone renderizam sem provider.
   - `CreateVideoDto` resolve para `Record<string, never>`; o payload usa o tipo local `CreateVideoRequest`.
@@ -386,9 +386,18 @@
   - O heading "Details" do Figma não foi renderizado: pertence ao formulário de metadados, fora de escopo (OQ-1). Página não renderizada no navegador; fidelidade visual não conferida contra o screenshot.
 
 ### SI-03.31b — Tela do vídeo no studio — upload em andamento (lógica & wiring)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** unit `video-studio-view.uploading.test.tsx` 10 passing + integration `get-video.integration.test.ts` 5 passing; E2E `studio-video-uploading.e2e-spec.ts` 7 passing (spec-derived, `next-frontend/specs/video-uploading.plan.md`) junto com `studio-video-upload` (4): 11/11 em 5 execuções consecutivas; vitest completo 239 passing (43 arquivos); `tsc --noEmit` exit 0; eslint 0 erros (1 warning pré-existente)
+- **Observations:**
+  - `get-video.ts` não faz refresh de token (RSC não regrava cookie): `401` vira `unauthorized` e a página redireciona para `/login`; outros erros do upstream lançam. Usa `cache: "no-store"`.
+  - `VideoStudioView` recebe `publicId` e `initialVideo`. O `video` devolvido pelo `upload-completion` é injetado com `setVideo` durante a renderização (padrão "ajustar estado ao mudar a entrada"), pois um efeito que chama `setState` é barrado pelo lint do React Compiler. `INVALID_VIDEO_STATE` recarrega via `GET /api/videos/{publicId}` num efeito (setState só no callback assíncrono) e `UNAUTHORIZED` redireciona para `/login`.
+  - Os estados `uploaded`/`processing`/`failed`/`ready` usam o `ProcessingStatus` já existente (`role="status"` = live region) em vez do `UploadProgressPanel`, porque o painel tem "Uploading... N%" fixo; o painel só aparece com upload ativo. O seletor de reanexação também aparece para qualquer erro do upload (`UPLOAD_INCOMPLETE`, `FILE_TOO_LARGE`, outros), não só `UPLOAD_INCOMPLETE`; mensagens em inglês exceto "Envio interrompido — selecione o arquivo novamente", que é o texto do plano. O link do `failed` diz "Upload a new video".
+  - A URL do VideoLink usa `useSyncExternalStore` para ler `window.location.origin` (vazio no SSR, preenchido após a hidratação), evitando mismatch de hidratação sem efeito.
+  - O estado `ready` ainda não tem tela própria (SI-03.32): hoje mostra só a copy de `ready` via `ProcessingStatus`, sem player nem download.
+  - Testes de unit usam `vi.stubGlobal("fetch")` e o provider stubado (mesmo precedente do SI-03.26/27); o hook de polling roda de verdade com fake timers.
+  - E2E: o teste segura os `PUT` de parte numa rota de teste só na origem reservada do storage (`route.fallback()` repassa ao fake compartilhado), liberando um a um para ver o percentual subir; no 1.3 a liberação acontece depois da asserção do painel (liberar antes deixaria o upload terminar antes da checagem). Espera a hidratação (`__reactProps`) antes de usar o seletor de reanexação.
+  - **Flakiness do ambiente (dev server Turbopack no Docker):** (1) o servidor ficou com o MSW inativo após várias edições (500 no login do BFF, "fetch failed" para `host.docker.internal:3000`); resolveu limpando `.next` e reiniciando, e também havia um segundo `next dev` órfão que não morria com `kill` do loop — derrubar pelo PID mostrado no log; (2) com 4 workers a navegação/hidratação às vezes passa de 5s/30s: deu margem de 15s ao redirect e `test.setTimeout(60_000)` no 1.1. Rodando só o cenário 1.3 24× em paralelo ainda falham ~3 (carga extrema); a suíte das duas telas passou 5/5.
+  - Página não verificada visualmente no navegador contra o screenshot do Figma.
 
 ### SI-03.32.0 — Drift audit: Tela do vídeo no studio — upload concluído (player + download)
 - **Status:** pending
