@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 35/45 completed
+**SIs:** 36/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -326,9 +326,12 @@
   - `Record<VideoProcessingStatus|VideoFailureReason, string>` já garante cobertura de copy em compilação; o teste só confere que nenhuma é vazia.
 
 ### SI-03.29 — Layout de `/studio` (auth gate, SideNav e provider de upload)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (auth gate coberto pelos E2E das telas); `tsc --noEmit` exit 0; eslint em `app/studio` 0 problemas
+- **Observations:**
+  - O layout não tem página filha ainda: `/studio` em si devolve 404 até as telas (SI-03.30+); o redirecionamento de anônimo só é observável nas rotas filhas.
+  - O `UploadProvider` envolve SideNav + `main`, para a instância Uppy sobreviver à navegação entre as rotas do studio.
+  - Gate verificado só por tipos/lint; o comportamento de redirect será exercido pelos E2E das telas.
 
 ### SI-03.30.0 — Drift audit: Tela de upload de vídeo
 - **Status:** pending
