@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 17/44 completed
+**SIs:** 18/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -163,9 +163,14 @@
   - A lista de tarefas persistente (TaskCreate) não está disponível neste ambiente; o progress file foi o único registro.
 
 ### SI-03.12 — Adapter FFmpeg (probe, normalização e thumbnail)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 28 new passing (`probe-metadata.spec.ts` 20, `ffmpeg.service.integration-spec.ts` 8); suite unit/integration 304 passing (`--runInBand`); e2e 79 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - **Rotação validada com ffmpeg real (pendência do plano/library-refs):** o `fluent-ffmpeg` não devolve `side_data_list`; ele achata o side data no próprio stream (`stream.rotation`, ex.: `90`). `readRotation` lê `rotation` primeiro e mantém `side_data_list[].rotation` e a tag `rotate` como fallback. O ffmpeg 5.1 converte `-metadata:s:v rotate=90` em displaymatrix, e o teste de integração gera esse fixture (320×240 → 240×320). Não há `-display_rotation` na versão 5.1 da imagem.
+  - `extractMetadata` ignora streams de vídeo com `disposition.attached_pic` (capa de álbum de mp3 não é vídeo), o que o plano não menciona; `durationMs` e dimensões ficam `null` quando ausentes (`N/A`).
+  - `normalize` em modo remux repassa o erro original do ffmpeg (o plano só classifica erro de transcode como `UnsupportedMediaError`); `thumbnail` também rejeita com o erro original. SI-03.13 deve tratá-los como transitórios (retry → `processing_error`). Transcode usa `-preset veryfast -pix_fmt yuv420p` (escolha minha, para compatibilidade de reprodução).
+  - Falhas de `ffprobe` logam o `err.message` do fluent-ffmpeg, que inclui o banner completo do ffprobe; ruidoso, mas fica só no log (nunca na mensagem do erro de domínio).
+  - `MediaModule` ainda não é importado por nada; o `WorkerModule` o importa em SI-03.13 junto com o processor.
 
 ### SI-03.13 — Processor `process-video` (pipeline de processamento)
 - **Status:** pending
