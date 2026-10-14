@@ -41,7 +41,7 @@ function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
       preload="metadata"
       src={src}
       poster={poster ?? undefined}
-      className={cn(base, "rounded-[var(--radius-3)]", className)}
+      className={cn(base, "rounded-t-[var(--radius-2)]", className)}
     />
   )
 }

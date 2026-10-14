@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { DownloadIcon } from "@/components/icons/download-icon";
 import { ProcessingStatus } from "@/components/studio/processing-status";
 import { ThumbUpload } from "@/components/studio/thumb-upload";
 import { UploadProgressPanel } from "@/components/studio/upload-progress-panel";
@@ -135,7 +136,8 @@ export function VideoStudioView({
     (upload?.phase === "uploading" || upload?.phase === "completing");
   const uploadFailed = awaiting && upload?.phase === "error";
   const interrupted = awaiting && !upload;
-  const inProgress = video.processingStatus !== "awaiting_upload";
+  const ready = video.processingStatus === "ready";
+  const inProgress = video.processingStatus !== "awaiting_upload" && !ready;
 
   const filename = upload?.fileName || video.filename;
   const uploadMessage = uploadFailed
@@ -217,8 +219,25 @@ export function VideoStudioView({
             filename={video.filename}
             quality={qualityLabel(video.width, video.height)}
             duration={formatDuration(video.durationMs)}
+            downloadSlot={
+              ready ? (
+                <Button type="button" variant="secondary" disabled>
+                  <DownloadIcon aria-hidden="true" />
+                  Download
+                </Button>
+              ) : undefined
+            }
           />
         </div>
+
+        {ready ? (
+          <div className="border-t border-border pt-4">
+            <ProcessingStatus
+              processingStatus="ready"
+              copy={processingStatusCopy("ready")}
+            />
+          </div>
+        ) : null}
       </Card>
     </div>
   );

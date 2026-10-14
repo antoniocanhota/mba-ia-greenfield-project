@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 43/45 completed
+**SIs:** 44/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -410,9 +410,14 @@
   - AC `git diff --name-only HEAD -- next-frontend` vazio: este SI não alterou nada em `next-frontend` (a árvore estava limpa).
 
 ### SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (visual shell); `tsc --noEmit` exit 0; eslint em `app` e `components` 0 erros (1 warning pré-existente); vitest de `components` 116 passing
+- **Observations:**
+  - `figma:figma-implement-design` indisponível; usada `figma:figma-design-to-code` com o contexto do SI-03.32.0 (sem nova chamada ao Figma), com a autorização já dada nos SIs anteriores.
+  - Drift aplicado verbatim (2 `auto-Edit`; os demais `skip`): `video-player.tsx` (`<video>` com `rounded-t-radius-2`) e `processing-status.tsx` (ícone `check_circle` de 12px em `text-success`, `gap-1`). Criado `components/icons/check-circle-icon.tsx`; o `CheckIcon` compartilhado não foi alterado. Sem `exception`/`CONFLICT`.
+  - Variante `ready` em `video-studio-view.tsx`: o `ProcessingStatus` sai do bloco do topo e vai para o rodapé (`border-t`), no lugar do CheckStatus do Figma (OQ-3); o `VideoDetailsCard` ganha o slot de download com um `Button variant="secondary"` desabilitado ("Download" + `DownloadIcon` `aria-hidden`) abaixo do VideoLink. O botão é estático nesta etapa: `href`, habilitação e a busca das media URLs são do SI-03.32b, assim como o `src`/`poster` do player.
+  - O `ProcessingStatus` mudou de ícone e gap em todos os estados `ready` (o teste existente não dependia disso e continua passando).
+  - Página não renderizada no navegador; fidelidade visual não conferida contra o screenshot.
 
 ### SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 - **Status:** pending
