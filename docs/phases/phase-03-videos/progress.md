@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 30/44 completed
+**SIs:** 31/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -290,9 +290,13 @@
   - Com isso os cinco Route Handlers BFF de vídeos (SI-03.20 a 24) estão prontos. Commit: o usuário pediu para não commitar esta SI.
 
 ### SI-03.25 — Infra: instalar `@uppy/core` e `@uppy/aws-s3`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (Infra); `tsc --noEmit` exit 0; vitest 162 passing; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - Instalados `@uppy/core@^6.2.0` (resolveu 6.2.0) e `@uppy/aws-s3@^6.2.2` (6.2.2), os únicos `@uppy/*` em `package.json`; `npm ls` mostra um único `@uppy/core` (deduped). Nenhum `@uppy/react`, `dashboard` ou `golden-retriever`. Só `package.json` e `package-lock.json` mudam (+168 linhas no lock).
+  - `@uppy/core` traz o próprio `nanoid@6.0.2` aninhado; o `npm audit` já reportava vulnerabilidades pré-existentes (inclusive `nanoid <=3.3.17` no topo da árvore, vindo do Next), nenhuma ligada aos pacotes novos.
+  - **Pendência de decisão herdada da library-refs:** o provider headless planejado para SI-03.26 usa `UppyContextProvider` de `@uppy/react`, que o plano proíbe instalar aqui e que não está em TD-05. SI-03.26 deve usar um contexto React escrito à mão (ou abrir revisão do TD-05).
+  - Ação 2 (commitar) não executada nesta SI: git fica com o usuário.
 
 ### SI-03.26 — Provider de upload (Uppy headless) para o studio
 - **Status:** pending
