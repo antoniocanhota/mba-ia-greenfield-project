@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 27/44 completed
+**SIs:** 28/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -265,9 +265,12 @@
   - O `publicId` não é validado no BFF: formato inválido chega ao upstream, que responde `404 VIDEO_NOT_FOUND` (comportamento do backend, SI-03.7).
 
 ### SI-03.22 — BFF Route Handler: POST /api/videos/{publicId}/upload-signatures
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 9 new passing (`app/api/videos/[publicId]/upload-signatures/__tests__/route.integration.test.ts`, contando os 3 casos do `it.each` de erro); vitest completo 149 passing (34 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - Os erros 400 `INVALID_UPLOAD_KEY`, 404 e 409 `INVALID_VIDEO_STATE` são exercitados com `server.use(...)`, pois o handler MSW de `upload-signatures` (SI-03.18) só tem o caminho feliz e o trigger `missingVid1`; o `it.each` confere status e envelope idênticos aos do upstream.
+  - Mesmo tratamento de corpo malformado do `POST /api/videos` (encaminhado como `{}` para o upstream responder o próprio 400). `SignUploadRequestDto` do contrato é `Record<string, never>` (SI-03.15), então o corpo (`method`, `key`, `uploadId`, `partNumber`) passa sem tipagem de campos.
+  - O BFF não valida `method`/`key`: quem restringe o que pode ser assinado (key vinculada ao rascunho, métodos permitidos) é o upstream (SI-03.8); a rota só repassa, como pede o plano.
 
 ### SI-03.23 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
 - **Status:** pending
