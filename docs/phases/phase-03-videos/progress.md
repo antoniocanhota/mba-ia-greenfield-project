@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 28/44 completed
+**SIs:** 29/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -273,9 +273,12 @@
   - O BFF não valida `method`/`key`: quem restringe o que pode ser assinado (key vinculada ao rascunho, métodos permitidos) é o upstream (SI-03.8); a rota só repassa, como pede o plano.
 
 ### SI-03.23 — BFF Route Handler: POST /api/videos/{publicId}/upload-completion
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 8 new passing (`app/api/videos/[publicId]/upload-completion/__tests__/route.integration.test.ts`, contando os 4 casos do `it.each`); vitest completo 157 passing (35 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - O teste do caminho feliz atravessa três rotas do BFF contra o store dos handlers MSW: `POST /api/videos` (rascunho) → `GET` em `awaiting_upload` → `upload-completion` → `GET` em `uploaded` com `sizeBytes` do pré-cadastro. Por isso o arquivo importa também as rotas `route.ts` de `videos` e `videos/[publicId]`.
+  - O upstream recebe a requisição sem corpo (o teste confere `body: ""`) e o Bearer da sessão; a rota não declara corpo porque o endpoint não tem `requestBody` no contrato.
+  - Os erros `409 UPLOAD_INCOMPLETE`, `409 INVALID_VIDEO_STATE`, `422 FILE_TOO_LARGE` e `404` são simulados com `server.use(...)`: o handler MSW de `upload-completion` (SI-03.18) só produz 200, 404 (`missingVid1`) e 409 `INVALID_VIDEO_STATE` (`failedVid01`).
 
 ### SI-03.24 — BFF Route Handler: GET /api/videos/{publicId}/media-urls
 - **Status:** pending
