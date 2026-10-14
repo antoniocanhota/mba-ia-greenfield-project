@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 23/44 completed
+**SIs:** 24/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -225,9 +225,16 @@
   - **Armadilha:** `prettier --write lib/auth` reformatou 4 arquivos existentes (`refresh.ts`, `error-mapping.ts` e dois testes); revertidos com `git checkout`, só os dois arquivos novos ficam no diff. Usar `prettier --write` apenas nos arquivos criados.
 
 ### SI-03.18 — Handlers MSW de vídeos (`mocks/handlers/videos.ts`)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 15 new passing (`mocks/handlers/__tests__/videos.integration.test.ts`); vitest completo 130 passing (31 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - **Bearer obrigatório nos handlers (além do plano):** os cinco handlers respondem `401 UNAUTHORIZED` sem `Authorization`, como o upstream real. Assim os testes dos BFF handlers (SI-03.20 a 24) provam que o token é injetado server-side. No E2E funciona porque o mock de login devolve `access_token` e a sessão o repassa.
+  - **Triggers fora de GET:** `missingVid1` dá 404 em todas as rotas `/videos/{publicId}/**`. `failedVid01`/`procVid0001`/`readyVid001` são stateless também no `upload-completion` (o `failedVid01` responde `409 INVALID_VIDEO_STATE`, como o backend; os outros devolvem a própria fixture). `media-urls` responde `409 VIDEO_NOT_READY` para qualquer vídeo não `ready` (rascunho, `uploaded`, `processing`, `failed`), então só `readyVid001` entrega as URLs.
+  - **Envelope de erro** segue o backend real (`{ statusCode, error: <CODE>, message }`, sem `code`); `VALIDATION_ERROR` de `too-large.mp4` usa `message` como array. Os handlers de auth usam `code: null` e `error` em outro formato; não alterei.
+  - **`sizeBytes`:** o rascunho devolve `sizeBytes: null` (o backend só o grava na conclusão) e o `upload-completion` aplica o tamanho declarado no `POST /videos`.
+  - `upload-signatures` só devolve `key` no `CreateMultipartUpload` (`method POST` sem `uploadId`); nas demais operações (`UploadPart` etc.) devolve só a `url` na origem `E2E_STORAGE_ORIGIN`, com `uploadId`/`partNumber` na query. As `thumbnailUrl`/`streamUrl`/`downloadUrl` também apontam para `storage.e2e.invalid`; precisam do fake de storage do SI-03.19 no E2E (e do `next/image` com `unoptimized`, já usado no `thumb-upload`).
+  - **Documentação da exceção ao padrão stateless:** o TD `e2e-video-upload-fixtures/TD-02` pede registrar o store em `next-frontend/CLAUDE.md` e `.claude/rules/next-frontend-msw-mocks.md`; o plano concentra isso no SI-03.19, então não toquei nesses arquivos aqui (o cabeçalho de `videos.ts` documenta a tabela de triggers e a exceção).
+  - O teste "reinicia o contador" depende da ordem dos testes do arquivo (o anterior também cria rascunho e o `afterEach` global zera o store).
 
 ### SI-03.19 — Fake de storage no Playwright e documentação das exceções de E2E
 - **Status:** pending
