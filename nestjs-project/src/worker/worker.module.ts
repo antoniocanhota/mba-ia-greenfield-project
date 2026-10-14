@@ -12,9 +12,10 @@ import swaggerConfig from '../config/swagger.config';
 import { buildTypeOrmOptions } from '../database/typeorm-options';
 import { QueueModule } from '../queue/queue.module';
 import { StorageModule } from '../storage/storage.module';
+import { VideoProcessingModule } from '../video-processing/video-processing.module';
 
 // HTTP-less root of the video worker: no controllers and no StorageBucketInitializer
-// (the API owns bucket setup). Processors are registered by later SIs.
+// (the API owns bucket setup). The queue processor lives in VideoProcessingModule.
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -38,6 +39,7 @@ import { StorageModule } from '../storage/storage.module';
     }),
     QueueModule,
     StorageModule,
+    VideoProcessingModule,
   ],
 })
 export class WorkerModule {}

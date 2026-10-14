@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 18/44 completed
+**SIs:** 19/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -173,9 +173,16 @@
   - `MediaModule` ainda não é importado por nada; o `WorkerModule` o importa em SI-03.13 junto com o processor.
 
 ### SI-03.13 — Processor `process-video` (pipeline de processamento)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 26 new passing (`video-processing.service.spec.ts` 15, `video.processor.spec.ts` 6, `video-processing.module.spec.ts` 1, `video-processing.service.integration-spec.ts` 4); suite unit/integration 330 passing (`--runInBand`, worker parado); e2e 79 passing; `tsc --noEmit` exit 0
+- **Observations:**
+  - **Bug de wiring achado pelo teste do `WorkerModule`:** `VideoProcessingModule` só registrava `Video`, e o TypeORM falha com "Entity metadata for Video#channel was not found" porque o grafo é `Video → Channel → User`. O módulo agora importa `ChannelsModule` e `UsersModule` (sem controllers, exportam `TypeOrmModule`) para o worker subir. O teste do SI-03.11 passava só porque o worker ainda não tinha entidades.
+  - **Teste com o worker de verdade:** subi `video-worker` e enfileirei um job para um vídeo inexistente; o processor consumiu e completou (guard de idempotência). O pipeline completo com ffmpeg/storage/DB foi coberto pelo teste de integração (MP4 gerado por `lavfi` → `ready`; texto → `failed` `unreadable_file` + `UnrecoverableError`; redelivery sem alterar `updated_at` nem o ETag).
+  - **Worker interfere nos e2e:** com o `video-worker` rodando, os e2e de `upload-completion` (SI-03.9) enfileiram jobs na fila `videos` de dev e o worker os consome. Rodei as suítes completas com `docker compose stop video-worker` e religuei depois. Vale decidir uma fila de teste separada (ou parar o worker no `pretest:e2e`) antes de fechar a fase.
+  - A limpeza do original (`discardOriginal`) é best-effort: falha de delete é logada, não relançada, para um hiccup de storage não transformar um vídeo já `ready`/`failed` em job com retry. Exceção deliberada à regra de não engolir erros, porque o status terminal já está persistido.
+  - Transcode usa o `onProgress` por etapa (5/20/35/60/70/85/100); o `VideoProcessor` ignora jobs que não são `process-video` (o roteamento do `sweep-videos` fica para o SI-03.14).
+  - O `NotAVideoError` é lançado no próprio service (probe sem stream de vídeo), já que o `FfmpegService` não conhece essa regra.
+  - Erro de probe 2 / upload com falha transitória deixa o vídeo em `processing`, e o retry reentra pelo guard (aceita `processing`).
 
 ### SI-03.14 — Scheduler e processor `sweep-videos`
 - **Status:** pending
