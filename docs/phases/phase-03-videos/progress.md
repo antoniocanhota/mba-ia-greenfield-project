@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 24/44 completed
+**SIs:** 25/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -237,9 +237,14 @@
   - O teste "reinicia o contador" depende da ordem dos testes do arquivo (o anterior também cria rascunho e o `afterEach` global zera o store).
 
 ### SI-03.19 — Fake de storage no Playwright e documentação das exceções de E2E
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (infra de teste, plano marca Tests vazio); verificado com um spec Playwright descartável (1 passing, removido); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente); vitest 130 passing
+- **Observations:**
+  - **Verificação sem dev server:** o spec descartável serviu uma página em `http://app.e2e.invalid/` (via `page.route`) para tornar as chamadas realmente cross-origin e exercitou create → `PUT` de parte → list → complete → delete contra `http://storage.e2e.invalid`. Confirmou `200` + `ETag` legível por JavaScript (`"e2e-part-1"`), XML com `UploadId`, `ListPartsResult` com a parte enviada, `CompleteMultipartUploadResult` e `204` no abort. O preflight de CORS foi respondido pelo próprio Playwright, sem handler de `OPTIONS`. Não rodei o dev server nem o Uppy real: a integração com o `@uppy/aws-s3` só será exercitada nos specs E2E de SI-03.30b/31b.
+  - **`ListParts` com estado por página:** o fake guarda as partes enviadas por `uploadId` (Map no closure de `routeStorageFake`, ou seja, por teste) para o `GET` listar o que foi subido; o plano só pedia o XML. Os `uploadId`s são `e2e-upload-N`.
+  - **Dependência do desenho do `upload-signatures`:** o fake distingue as operações por método + `uploadId` na query (o handler MSW do SI-03.18 coloca `uploadId`/`partNumber` na URL assinada). Se o Uppy 6 assinar a criação do multipart com `?uploads` e o fake não depender disso, continua funcionando; mas se o SI-03.26 mudar a forma de assinar, vale reconferir.
+  - **Docs atualizadas com as duas exceções** (`e2e-video-upload-fixtures/TD-01` e `TD-02`): `next-frontend/CLAUDE.md` § E2E architecture, `.claude/rules/next-frontend-msw-mocks.md` (nova seção "Stateful handlers") e `.claude/skills/testing-guide-next-frontend/references/external-systems.md` (linha de Object Storage de "Fake (deferred)" para o fake de browser; também ajustei a frase de abertura, que dizia que o Storage estava adiado). Arquivos em `.claude/` e `next-frontend/CLAUDE.md` entram no diff desta SI.
+  - O fixture `network` agora recebe `page` e registra o fake em todo teste E2E; a regra de não interceptar `/api/**` continua válida e está escrita no comentário do fixture.
 
 ### SI-03.20 — BFF Route Handler: POST /api/videos
 - **Status:** pending

@@ -225,6 +225,11 @@ Real browser → real Next.js (RSC, layouts, real `/api/**` Route Handlers serve
 - Upstream handlers are **shared** with Vitest — no E2E-only fork; per-scenario deviation is a reserved trigger fixture branch, not a runtime override. Trigger values must not collide with Vitest fixture values.
 - `onUnhandledRequest`: `"error"` in Vitest, **`"bypass"`** in instrumentation — never copy `"error"` into `instrumentation.ts`.
 
+**Two documented exceptions** (video upload, Phase 03):
+
+- **Browser-side storage fake (`e2e-video-upload-fixtures/TD-01`).** The browser uploads video parts straight to presigned storage URLs, which no server-side MSW can see. `tests/storage-fake.ts` (`routeStorageFake(page)`, auto-applied by the `network` fixture in `tests/fixtures.ts`) calls `page.route()` **only** for the reserved origin `E2E_STORAGE_ORIGIN` (`mocks/storage-origin.ts`, `http://storage.e2e.invalid`) and answers the S3 subset Uppy uses. This is the only allowed browser-level `page.route()`: it must never match `/api/**`, and no other origin may be added without a new decision.
+- **Stateful video handlers (`e2e-video-upload-fixtures/TD-02`).** `mocks/handlers/videos.ts` keeps an in-memory store keyed by `publicId` (deterministic counter ids `vid00000001`…, `resetVideoStore()` called from the `afterEach` in `mocks/setup.ts`), so the sequence draft → `upload-completion` → polling is observable. This is an exception to the stateless reserved-trigger rule, allowed **only** for resources with a lifecycle; reserved triggers (`missingVid1`, `failedVid01`, `readyVid001`, `procVid0001`, `too-large.mp4`) stay stateless and take precedence. Tests read the `publicId` from the response instead of assuming it (the counter is shared by parallel E2E workers).
+
 ## Stack Summary
 
 Next.js App Router with React Server Components, TypeScript strict, React 19, Tailwind CSS v4 (CSS-first config via `@theme inline` in `app/globals.css` — there is NO `tailwind.config.js`), shadcn/ui (style `radix-nova`, baseColor `neutral`, `cssVariables: true`) on top of `radix-ui` primitives, `class-variance-authority` (`cva`) with extended `tailwind-merge`, custom SVG icon components in `components/icons/` (no external icon library), `Inter` + `Geist_Mono` fonts loaded via `next/font/google` in `app/layout.tsx`. Exact versions in `package.json`.

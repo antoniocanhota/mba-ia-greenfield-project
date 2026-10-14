@@ -1,5 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 
+import { routeStorageFake } from "./storage-fake";
+
 type NetworkFixtures = {
   network: void;
 };
@@ -11,8 +13,17 @@ type NetworkFixtures = {
 //   - Do NOT reach the real NestJS API — upstream is faked by mocks/ handlers.
 //   - Per-scenario outcomes use reserved trigger fixtures in shared handlers
 //     (e.g. "conflict@example.com" → 409); no per-test server.use() here.
+// The one browser-side fake is object storage: the browser uploads parts straight to
+// presigned URLs, so routeStorageFake answers them on the reserved storage origin only
+// (e2e-video-upload-fixtures/TD-01).
 export const test = base.extend<NetworkFixtures>({
-  network: [async ({}, use) => { await use(); }, { auto: true }],
+  network: [
+    async ({ page }, use) => {
+      await routeStorageFake(page);
+      await use();
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };

@@ -22,6 +22,16 @@ By convention, MSW lives under `next-frontend/mocks/`. The tree is per-domain �
 
 Tests override fixtures per-case via `server.use(http.get(...))` inside `beforeEach` or individual `it` blocks.
 
+## Stateful handlers — exception for resources with a lifecycle
+
+Handlers are **stateless by default** (reserved trigger fixtures, response depends only on the request). A domain may keep an **in-memory store** only when the resource has a lifecycle that later requests must observe (e.g. video `awaiting_upload` → `uploaded`; per `e2e-video-upload-fixtures/TD-02`). When you do:
+
+- Key the store by the resource id, and generate **deterministic ids** (module-level counter, fixed-width, never colliding with the reserved trigger ids).
+- Export `resetVideoStore()`-style reset (clears the store **and** the counter) and call it from the `afterEach` in `mocks/setup.ts`, next to `server.resetHandlers()`.
+- Reserved triggers stay stateless and take precedence over the store; unknown non-reserved ids keep answering the default fixture.
+- Tests read ids from the response; E2E workers share one server process, so never assume a specific id there.
+- Document the store and the trigger table at the top of the handler file.
+
 ## Lifecycle (Vitest `setupFiles`)
 
 The MSW server is started once per Vitest run, reset between tests, and torn down at the end:

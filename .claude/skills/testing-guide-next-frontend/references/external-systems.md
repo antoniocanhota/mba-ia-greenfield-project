@@ -2,12 +2,12 @@
 
 # External Systems — Real vs Fake
 
-`next-frontend` has exactly one live external dependency it owns the contract with: the **NestJS upstream API**. Object Storage is deferred. The browser never talks to either directly (strict BFF model).
+`next-frontend` has exactly one live external dependency it owns the contract with: the **NestJS upstream API**. Object Storage is reached **by the browser** through presigned URLs (the bytes bypass the BFF), so it is faked in the browser for E2E. Otherwise the browser never talks to the upstream directly (strict BFF model).
 
 | External system | Strategy | Mechanism | Why |
 |---|---|---|---|
 | **NestJS upstream API** (reached via `lib/api/upstream.ts`) | **Fake** | Vitest: `msw/node` (`mocks/server.ts` + `mocks/setup.ts`). E2E: server-side MSW booted by `instrumentation.ts` when `MSW_ENABLED=true`. | The upstream has its own test suite; hitting it from `next-frontend` tests would be slow, flaky, cross-project-coupled, and non-deterministic. |
-| **Object Storage (S3/MinIO)** | **Fake (deferred)** | Not wired (no media features yet). When added: in-memory/local emulator, never a real bucket. | Network + cost + flakiness; nothing to test until a media feature exists. |
+| **Object Storage (S3/MinIO)** | **Fake** | E2E: `tests/storage-fake.ts` (`routeStorageFake`, auto-applied by the `network` fixture) uses `page.route()` on the reserved origin `E2E_STORAGE_ORIGIN` (`http://storage.e2e.invalid`) only, answering the S3 multipart subset (`e2e-video-upload-fixtures/TD-01`). Vitest: not reached (the BFF only forwards presigned URLs). Never a real bucket. | The browser uploads parts straight to presigned URLs, so server-side MSW cannot see them; real S3/CORS behavior is covered by the backend integration tests. |
 | **Same-origin `/api/**` Route Handlers** | **Real** in E2E; **as functions** in Vitest integration | E2E: real handlers run server-side in the containerized app. Vitest: imported and called directly. | The BFF logic IS the unit under test — never fake it; only fake what it calls (upstream). |
 
 ## The MSW boundary — non-negotiable
