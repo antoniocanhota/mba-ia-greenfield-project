@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 33/45 completed
+**SIs:** 34/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -311,9 +311,11 @@
   - Usei apenas o Prettier nos arquivos criados (lição do SI-03.17).
 
 ### SI-03.27 — Hook de polling `useVideoStatus`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 9 passing (`hooks/__tests__/use-video-status.test.tsx`); `tsc --noEmit` exit 0; eslint em `hooks/` 0 problemas
+- **Observations:**
+  - Os testes stubam `fetch` com `vi.stubGlobal` em vez de MSW: o `fetch` do Node em jsdom não resolve URL relativa (`/api/videos/...`) e o controle de resposta lenta/timers fica direto; mesmo precedente do `upload-provider.test.tsx` (SI-03.26).
+  - Respostas não-OK diferentes de 401 (ex.: 5xx) e falhas de rede não interrompem o polling: o hook reagenda e tenta de novo. O plano só define parada em `ready`/`failed` e em 401.
 
 ### SI-03.28 — Utilitários de apresentação de vídeo (`lib/videos/format.ts`)
 - **Status:** pending
