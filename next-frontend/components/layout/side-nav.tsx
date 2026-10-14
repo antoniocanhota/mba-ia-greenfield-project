@@ -23,9 +23,12 @@ function SideNav({ className }: { className?: string }) {
     <nav
       data-slot="side-nav"
       aria-label="Main navigation"
-      className={cn("flex w-60 shrink-0 flex-col gap-4 p-3", className)}
+      className={cn(
+        "flex w-64 shrink-0 flex-col gap-4 border-r border-border bg-background p-4",
+        className
+      )}
     >
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-1 border-b border-border pb-4">
         {primaryItems.map((item) => (
           <li key={item.href}>
             <SideNavItem {...item} active={pathname === item.href} />
@@ -33,7 +36,7 @@ function SideNav({ className }: { className?: string }) {
         ))}
       </ul>
       <div className="flex flex-col gap-1">
-        <h2 className="px-3 text-label-lg text-foreground">You</h2>
+        <h2 className="px-3 text-h3 text-foreground">You</h2>
         <ul className="flex flex-col gap-1">
           {youItems.map((item) => (
             <li key={item.href}>

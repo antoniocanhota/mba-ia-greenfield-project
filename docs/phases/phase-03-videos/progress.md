@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 37/45 completed
+**SIs:** 38/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -343,9 +343,15 @@
   - Altura da linha de 46px não tem token de spacing; o bullet usa `py-2.5` (44px) como aproximação.
 
 ### SI-03.30a — Tela de upload de vídeo (visual shell)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (visual shell); `tsc --noEmit` exit 0; eslint em `app/studio`, `components/layout`, `components/studio` 0 problemas; vitest dos componentes alterados 46 passing
+- **Observations:**
+  - `figma:figma-implement-design` indisponível; com autorização do usuário ("Continue" após o aviso) foi usada `figma:figma-design-to-code` com o contexto do `get_design_context` já obtido no SI-03.30.0 (sem nova chamada ao Figma).
+  - Drift aplicado verbatim: `side-nav.tsx` (w-64, p-4, border-r, bg-background, border-b na seção primária, "You" em text-h3), `side-nav-item.tsx` (radius-2, gap-7, px-3.5 py-2.5, text-body-lg, ativo bg-card), `upload-dropzone.tsx` (borda sólida, radius-2, bg-card, pt-16 pb-10, gap-6, círculo bg-background em volta do ícone, text-foreground, heading text-h2, gap-2, botão size sm). Sem `exception`/`CONFLICT`; o guard de variantes não achou siblings `dark:`/estado conflitantes.
+  - `onFileSelected` do `UploadDropzone` virou opcional: a página é RSC e não pode passar função a um client component; o wiring entra em SI-03.30b.
+  - O spinner do estado `loading` não foi envolvido no círculo de 128px (fora do relatório); revisar no 30b se a tela pedir.
+  - Página não foi renderizada no navegador (servidor dev não iniciado, per CLAUDE.md do frontend); fidelidade visual não conferida contra o screenshot.
+  - `prettier --check` acusa `upload-dropzone.tsx` (arquivo do bootstrap sem ponto e vírgula, estilo anterior); não reformatado para manter o diff restrito.
 
 ### SI-03.30b — Tela de upload de vídeo (lógica & wiring)
 - **Status:** pending

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { UploadIcon } from "@/components/icons/upload-icon"
 
 type UploadDropzoneProps = {
-  onFileSelected: (file: File) => void
+  onFileSelected?: (file: File) => void
   loading?: boolean
   error?: string | null
   className?: string
@@ -32,12 +32,12 @@ function UploadDropzone({
     setDragOver(false)
     if (loading) return
     const file = event.dataTransfer.files?.[0]
-    if (file) onFileSelected(file)
+    if (file) onFileSelected?.(file)
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (file) onFileSelected(file)
+    if (file) onFileSelected?.(file)
     event.target.value = ""
   }
 
@@ -50,7 +50,7 @@ function UploadDropzone({
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
       className={cn(
-        "flex flex-col items-center gap-4 rounded-[var(--radius-4)] border border-dashed border-border px-6 py-12 text-center transition-colors",
+        "flex flex-col items-center gap-6 rounded-[var(--radius-2)] border border-solid border-border bg-card px-6 pt-16 pb-10 text-center transition-colors",
         dragOver && "border-primary bg-muted/40",
         loading && "opacity-70",
         className
@@ -63,10 +63,12 @@ function UploadDropzone({
           className="size-12 animate-spin rounded-full border-4 border-muted border-t-primary"
         />
       ) : (
-        <UploadIcon className="size-12 text-muted-foreground" />
+        <span className="flex items-center justify-center rounded-full bg-background p-10">
+          <UploadIcon className="size-12 text-foreground" />
+        </span>
       )}
-      <div className="flex flex-col gap-1">
-        <p className="text-h3 text-foreground">
+      <div className="flex flex-col gap-2">
+        <p className="text-h2 text-foreground">
           Drag and drop a video file to upload
         </p>
         <p className="text-body-md text-muted-foreground">
@@ -86,7 +88,7 @@ function UploadDropzone({
       />
       <Button
         type="button"
-        size="md"
+        size="sm"
         disabled={loading}
         onClick={() => inputRef.current?.click()}
       >
