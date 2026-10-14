@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 25/44 completed
+**SIs:** 26/44 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -247,9 +247,13 @@
   - O fixture `network` agora recebe `page` e registra o fake em todo teste E2E; a regra de não interceptar `/api/**` continua válida e está escrita no comentário do fixture.
 
 ### SI-03.20 — BFF Route Handler: POST /api/videos
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5 new passing (`app/api/videos/__tests__/route.integration.test.ts`); vitest completo 135 passing (32 arquivos); `tsc --noEmit` exit 0; `npm run lint` 0 erros (1 warning pré-existente)
+- **Observations:**
+  - Corpo malformado (JSON inválido) é encaminhado como `{}` para o upstream responder o próprio `400`, em vez de estourar 500 no `request.json()`; o plano não cobria esse caso. A rota de login existente não trata isso.
+  - Sem validação no BFF: o `CreateVideoDto` do contrato é `Record<string, never>` (SI-03.15), então o corpo vai cru ao upstream, que valida (class-validator). O `body` compila porque o tipo vazio aceita o objeto lido.
+  - O teste de 400 usa o trigger `too-large.mp4` do handler MSW (SI-03.18), e o de Bearer confere que o token da sessão chega ao upstream.
+  - O handler é fino: toda a regra de sessão/refresh/pass-through está em `callAuthorizedUpstream`; os próximos handlers (SI-03.21 a 24) seguem o mesmo molde.
 
 ### SI-03.21 — BFF Route Handler: GET /api/videos/{publicId}
 - **Status:** pending
