@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** completed
-**SIs:** 45/45 completed
+**Status:** in_progress
+**SIs:** 46/46 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -438,6 +438,15 @@
   - Instalado `@uppy/react@^6.0.0` (6.0.0) sem os peers opcionais (`dashboard`, `status-bar`, `webcam`, `screen-capture`) nem `golden-retriever`. `package.json` lista só `@uppy/core`, `@uppy/aws-s3` e `@uppy/react`; `npm ls @uppy/core` mostra uma única versão (6.2.0, deduped).
   - **Dependências transitivas de `@uppy/*` no lockfile:** `@uppy/react` puxa `@uppy/components`, `@uppy/google-drive-picker` e `@uppy/google-photos-picker` (dependências de runtime dele, não declaradas no `package.json`). O critério "nenhum outro pacote `@uppy/*`" foi lido como sobre o `package.json`; os pickers do Google vêm junto de `@uppy/components` e não são importados pelo app.
   - O lock também mudou +104/−2 linhas (preact, use-sync-external-store e afins). Ação 2 (commitar) não executada: git fica com o usuário.
+
+### SI-03.34 (amendment of SI-03.1) — Infra: storage de dev/test em RustFS
+- **Status:** completed
+- **Tests:** no tests (Infra); verificação dos ACs: `docker compose config --quiet` exit 0; `curl -f http://localhost:9000/health` → 200; `storage.service`, `storage-bucket.initializer` e `upload-signing.service` integration specs 15 passing contra o RustFS
+- **Observations:**
+  - Appended by /plan-build append-mode on 2026-10-15; tracks delta from phase-03-videos/TD-01 Revision 2026-10-15.
+  - Ação 1 só conferiu o estado: o serviço `storage` já rodava `rustfs/rustfs:1.0.1` (healthy), portas 9000/9001, `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` iguais a `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` do `.env.example` e `RUSTFS_CORS_ALLOWED_ORIGINS=http://localhost:3001`. Nenhuma mudança de configuração.
+  - Ação 2: o comentário do `storage` em `compose.yaml` agora cita `phase-03-videos/TD-01` (revisão 2026-10-15) em vez de descrever a troca como desvio.
+  - Ainda dizem "MinIO", fora do escopo deste SI: o Setup dos specs `videos-upload-signatures`, `videos-upload-completion` e `videos-media-urls` (linha 19), e a prosa de `e2e-video-upload-fixtures/TD-01`. Commit: git fica com o usuário.
 
 ## Final verification — 2026-10-15
 

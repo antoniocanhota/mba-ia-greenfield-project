@@ -60,6 +60,7 @@ _Subprojects in scope:_
 **Revisions:**
 
 - 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in Compose; RustFS/SeaweedFS stay drop-in fallbacks because the app only uses the S3 API through the AWS SDK. _Rationale:_ Archived image accepted for dev-only use.
+- 2026-10-15 — Dev/test storage switched from MinIO to RustFS (`rustfs/rustfs:1.0.1`), activating the drop-in fallback from the 2026-10-07 revision; same service/ports, S3 API via AWS SDK unchanged. _Rationale:_ The `minio/minio` image no longer pulls (Docker Hub `pull access denied`; no `quay.io/minio/minio:latest`), so pinning the last community tag became impossible. RustFS was the original Recommendation (Option B) and keeps the `storage` service name, ports 9000/9001 and the app's S3-only contract. Only the Compose envs change (`RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`, CORS via `RUSTFS_CORS_ALLOWED_ORIGINS`). Integration tests run against real RustFS. Decision letter stays A by user choice (Revision, not Supersede), so read A as "MinIO-compatible S3 server, currently RustFS".
 
 ---
 

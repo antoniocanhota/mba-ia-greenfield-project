@@ -3,7 +3,7 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-14T09:18:25-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T09:54:02-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
@@ -15,7 +15,7 @@ sources_mtime:
   .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-09-28T14:55:47-03:00"
   .claude/skills/testing-guide-next-frontend/SKILL.md: "2026-09-28T14:55:47-03:00"
   docs/inventories/screen-inventory-phase-03-videos.md: "2026-10-13T14:25:28-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-14T09:50:37-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
 ---
 
 # phase-03-videos — Context
@@ -56,7 +56,7 @@ sources_mtime:
 | Ref | Source | Scope | Topic | Status | Decision | Libraries |
 |-----|--------|-------|-------|--------|----------|-----------|
 | phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | decided | A (MinIO) | @aws-sdk/client-s3, @aws-sdk/s3-request-presigner |
-|     └─ Last revision: 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in Comp… | | | | | | |
+|     └─ Last revision: 2026-10-15 — Dev/test storage switched from MinIO to RustFS (`rustfs/rustfs:1.0.1`), activat… | | | | | | |
 | phase-03-videos/TD-02 | phase | Backend | Background Job Queue | decided | A (BullMQ + Redis) | bullmq, @nestjs/bullmq |
 | phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
 | phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | decided | A (presigned S3 multipart) | — |
@@ -113,6 +113,7 @@ _Source files:_
 
 **Revisions:**
 - 2026-10-07 — Archived MinIO image accepted for dev: pin the last community image tag in Compose; RustFS/SeaweedFS stay drop-in fallbacks because the app only uses the S3 API through the AWS SDK. _Rationale:_ Archived image accepted for dev-only use.
+- 2026-10-15 — Dev/test storage switched from MinIO to RustFS (`rustfs/rustfs:1.0.1`), activating the drop-in fallback from the 2026-10-07 revision; same service/ports, S3 API via AWS SDK unchanged. _Rationale:_ The `minio/minio` image no longer pulls (Docker Hub `pull access denied`; no `quay.io/minio/minio:latest`), so pinning the last community tag became impossible. RustFS was the original Recommendation (Option B) and keeps the `storage` service name, ports 9000/9001 and the app's S3-only contract. Only the Compose envs change (`RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`, CORS via `RUSTFS_CORS_ALLOWED_ORIGINS`). Integration tests run against real RustFS. Decision letter stays A by user choice (Revision, not Supersede), so read A as "MinIO-compatible S3 server, currently RustFS".
 
 ### phase-03-videos/TD-02
 

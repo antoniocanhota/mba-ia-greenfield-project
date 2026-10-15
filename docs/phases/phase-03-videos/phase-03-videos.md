@@ -3,9 +3,9 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-14T09:50:49-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-14T09:50:37-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-14T09:18:25-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-15T10:03:23-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T09:54:02-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
@@ -1307,6 +1307,28 @@ E2E da página (reprodução com `src` pré-assinado, download, estado `ready` v
 
 ---
 
+### SI-03.34 (amendment of SI-03.1) — Infra: storage de dev/test em RustFS
+
+**Description:** Registrar no plano a troca do servidor S3 de dev/test de MinIO para RustFS (`rustfs/rustfs:1.0.1`), formalizada pela revisão 2026-10-15 do TD-01: a imagem `minio/minio` não puxa mais, e o RustFS é o fallback drop-in já previsto no TD. O app continua falando só a API S3 via AWS SDK, então nenhum código de aplicação muda.
+
+**Technical actions:**
+
+1. Conferir que o serviço `storage` de `nestjs-project/compose.yaml` usa `rustfs/rustfs:1.0.1`, portas `9000`/`9001`, credenciais por `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY` (iguais a `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` do `.env.example`) e CORS por `RUSTFS_CORS_ALLOWED_ORIGINS=http://localhost:3001` (per `phase-03-videos/TD-01`, revisão 2026-10-15).
+2. Trocar o comentário acima do serviço `storage` em `nestjs-project/compose.yaml` para citar a revisão 2026-10-15 do `phase-03-videos/TD-01` como origem da escolha do RustFS, em vez de descrevê-la como desvio do TD.
+
+**Tests:** _(empty — Infra; a cobertura contra o storage real já existe nas suítes de integração de SI-03.3, SI-03.8, SI-03.9, SI-03.10, SI-03.13 e SI-03.14)_
+
+**Dependencies:** SI-03.1
+
+**Acceptance criteria:**
+
+- `docker compose up -d` (em `nestjs-project/`) sobe `storage` com a imagem `rustfs/rustfs:1.0.1` e status healthy.
+- `curl -f http://localhost:9000/health` responde `200`.
+- O comentário do serviço `storage` em `compose.yaml` referencia `phase-03-videos/TD-01` (revisão 2026-10-15).
+- As suítes de integração do storage (`storage.service.integration-spec.ts`, `storage-bucket.initializer.integration-spec.ts`, `upload-signing.service.integration-spec.ts`) passam contra o RustFS do Compose.
+
+---
+
 ## Technical Specifications
 
 ### Data Model
@@ -1345,7 +1367,7 @@ Layout derivado de forma determinística do `public_id` por um único helper do 
 | `videos/{public_id}/video.mp4` | Worker | Privado — só via presigned GET emitido pela API (phase-03-videos/TD-09) | Único arquivo de vídeo retido |
 | `thumbnails/{public_id}.jpg` | Worker | Public-read (bucket policy no prefixo `thumbnails/*`) — URL estável (phase-03-videos/TD-09) | Retido |
 
-**Bucket configuration (idempotente, aplicada no boot da API):** bucket criado se ausente; lifecycle rule `AbortIncompleteMultipartUpload` com `DaysAfterInitiation: 1` (phase-03-videos/TD-04, revisão 2026-10-07); bucket policy de leitura anônima restrita a `thumbnails/*`; CORS permitindo `PUT`/`POST`/`GET`/`DELETE` a partir da origem do frontend (`http://localhost:3001` em dev) e expondo o header `ETag` (necessário para o Uppy montar o `CompleteMultipartUpload`). No MinIO o CORS é configurado no serviço (env `MINIO_API_CORS_ALLOW_ORIGIN` no Compose), não via `PutBucketCors`; o suporte da imagem fixada a lifecycle e CORS deve ser confirmado no implement (library-refs: "confirm that the pinned MinIO image supports bucket lifecycle at implement time").
+**Bucket configuration (idempotente, aplicada no boot da API):** bucket criado se ausente; lifecycle rule `AbortIncompleteMultipartUpload` com `DaysAfterInitiation: 1` (phase-03-videos/TD-04, revisão 2026-10-07); bucket policy de leitura anônima restrita a `thumbnails/*`; CORS permitindo `PUT`/`POST`/`GET`/`DELETE` a partir da origem do frontend (`http://localhost:3001` em dev) e expondo o header `ETag` (necessário para o Uppy montar o `CompleteMultipartUpload`). No RustFS de dev/test (phase-03-videos/TD-01, revisão 2026-10-15) o CORS é configurado no serviço (env `RUSTFS_CORS_ALLOWED_ORIGINS` no Compose), não via `PutBucketCors`; a lifecycle rule e a bucket policy foram aceitas pelo RustFS no implement (SI-03.3).
 
 ### API Contracts
 
@@ -1905,6 +1927,7 @@ SI-03.1 (root — infra: deps, config, storage + redis no Compose, ffmpeg)
 │                   └── SI-03.9 — depends on SI-03.8 (completion só faz sentido após o multipart assinado)
 │                       └── SI-03.10 — depends on SI-03.9 (media URLs exigem o fluxo até `ready`)
 ├── SI-03.4 — depends on SI-03.1 (fila precisa do Redis e da config)
+├── SI-03.34 — depends on SI-03.1 (amendment: storage de dev/test em RustFS, TD-01 revisão 2026-10-15)
 └── SI-03.11 — depends on SI-03.3, SI-03.4 (worker importa storage e fila)
     └── SI-03.13 — depends on SI-03.9, SI-03.11, SI-03.12 (processor consome o job enfileirado no completion)
         └── SI-03.14 — depends on SI-03.13 (sweep é roteado pelo mesmo processor da fila)
@@ -2004,6 +2027,7 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
 - [ ] SI-03.32a — Tela do vídeo no studio — upload concluído (visual shell)
 - [ ] SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 - [ ] SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
+- [ ] SI-03.34 (amendment of SI-03.1) — Infra: storage de dev/test em RustFS
 
 **Per-screen deliverables:**
 

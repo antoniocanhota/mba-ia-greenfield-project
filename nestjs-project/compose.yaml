@@ -52,8 +52,8 @@ services:
       - "1025:1025"
       - "8025:8025"
 
-  # S3-compatible object storage. TD-01 chose MinIO, but `minio/minio` no longer
-  # pulls (archived), so RustFS — the TD's drop-in fallback — runs here instead.
+  # S3-compatible object storage: RustFS, per phase-03-videos/TD-01 (revision
+  # 2026-10-15) — `minio/minio` no longer pulls, and the app only uses the S3 API.
   storage:
     image: rustfs/rustfs:1.0.1
     ports:
