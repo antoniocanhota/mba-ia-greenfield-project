@@ -4,9 +4,9 @@ name: phase-03-videos
 status: clean
 issue_count: 0
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-15T11:22:45-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-15T12:46:31-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T12:46:31-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T12:44:52-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
 issues:
@@ -114,6 +114,10 @@ issues:
     status: resolved
     summary: "e2e-video-upload-fixtures/TD-02 server-generated publicIds vs deterministic MSW fixtures"
     resolved_by: e2e-video-upload-fixtures/TD-02
+  - id: AMB-6
+    status: resolved
+    summary: "TD-06 title revision: which studio display shows `title` vs the original filename?"
+    resolved_by: phase-03-videos/TD-06
 advisories: []
 ---
 
@@ -177,3 +181,4 @@ _None._
 - **AMB-4** _(resolved_by phase-03-videos/TD-06)_ — Can a file be re-attached to a draft the sweep marked failed (upload_abandoned)? Revision 2026-10-07 on TD-06: `failed` is terminal for every `failureReason`. Re-uploading creates a new draft from `/studio/upload`, the failed draft remains until Phase 04, and its page shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching is allowed only while `processing_status = awaiting_upload`.
 - **AMB-5** _(resolved_by phase-03-videos/TD-04)_ — TD-04: how to abort the old multipart after reload when uploadId isn't persisted. Third 2026-10-07 revision on TD-04 replaces the unexecutable "best-effort via `signRequest`" clause. When the API signs a `CreateMultipartUpload` for a draft's key, it first calls `ListMultipartUploads` (Prefix = key) and aborts every in-progress upload. This is server-side only, with no `uploadId` persisted, and the lifecycle rule stays as the backstop.
 - **ICC-1** _(resolved_by e2e-video-upload-fixtures/TD-02)_ — e2e-video-upload-fixtures/TD-02 server-generated publicIds vs deterministic MSW fixtures. Revision 2026-10-13 on TD-02 (Option A kept): the in-memory store generates `publicId`s from a module-level counter (`vid` + zero-padded number, 11 chars), reset by `resetVideoStore()` in `mocks/setup.ts` `afterEach`. Vitest tests see a fixed ID sequence and can assert exact values; E2E workers share one Next.js process, so IDs stay unique. The "must not assume a fixed `publicId`" clause is replaced.
+- **AMB-6** _(resolved_by phase-03-videos/TD-06)_ — TD-06 title revision: which studio display shows `title` vs the original filename? Option (d): revision 2026-10-15 on TD-06 (Option B kept) makes `title` contract-only in Phase 03 — persisted and exposed via the API response, `openapi.json`, `types.gen.ts` and MSW fixtures, with no studio screen rendering it; the Filename block keeps `filename`, the heading stays "Video details", `UploadProgressPanel` keeps the local `File` name. Display and editing arrive with the Phase 04 details form.

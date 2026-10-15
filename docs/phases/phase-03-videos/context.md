@@ -3,7 +3,7 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T12:44:52-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
@@ -15,7 +15,7 @@ sources_mtime:
   .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-09-28T14:55:47-03:00"
   .claude/skills/testing-guide-next-frontend/SKILL.md: "2026-09-28T14:55:47-03:00"
   docs/inventories/screen-inventory-phase-03-videos.md: "2026-10-13T14:25:28-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T12:46:31-03:00"
 ---
 
 # phase-03-videos — Context
@@ -65,7 +65,7 @@ sources_mtime:
 | phase-03-videos/TD-05 | phase | Frontend | Browser Upload Client | decided | A (Uppy 6 headless) | @uppy/core, @uppy/aws-s3, @uppy/react |
 |     └─ Last revision: 2026-10-14 — `@uppy/react` is adopted, as Option A's title already listed: the `/studio` uplo… | | | | | | |
 | phase-03-videos/TD-06 | phase | Cross-layer | Video Lifecycle Status Model | decided | B (Two orthogonal fields) | — |
-|     └─ Last revision: 2026-10-08 — Wire-format (API/OpenAPI) field names are camelCase: `processingStatus` and `pub… | | | | | | |
+|     └─ Last revision: 2026-10-15 — In Phase 03 `title` is contract-only: it is persisted and exposed through the A… | | | | | | |
 | phase-03-videos/TD-07 | phase | Cross-layer | Public Video Identifier for Unique URLs | decided | B (Random 11-char base64url) | — |
 | phase-03-videos/TD-08 | phase | Cross-layer | Playback Format and Processing Scope | decided | A (Normalize to a single progressive MP4) | — |
 |     └─ Last revision: 2026-10-07 — The original upload object is deleted as soon as processing reaches a terminal … | | | | | | |
@@ -155,6 +155,8 @@ _Source files:_
 **Revisions:**
 - 2026-10-07 — `processing_status: failed` is terminal: the API rejects any transition out of `failed`, whatever the `failureReason` (including `upload_abandoned`), so no file can be re-attached to a failed draft. Re-uploading means creating a new draft from `/studio/upload`. The failed draft keeps its `publicId` and stays until Phase 04 adds video management. On `/studio/videos/[publicId]` the `failed` state shows the `failureReason` message plus a link to `/studio/upload`. Re-attaching to the same draft (the "Envio interrompido" state) is allowed only while `processing_status = awaiting_upload`. _Rationale:_ failed is terminal. This is consistent with the `TD-08` revision ("a failed video is re-uploaded rather than reprocessed") (resolves AMB-4 of phase-03 validation).
 - 2026-10-08 — Wire-format (API/OpenAPI) field names are camelCase: `processingStatus` and `publicationStatus`. Enum values (`awaiting_upload`, `uploaded`, `processing`, `ready`, `failed`, `draft`, `published`) and DB columns (`processing_status`, `publication_status`) are unchanged. _Rationale:_ Aligns the video contract with the other camelCase wire fields (`publicId`, `failureReason`, `durationMs`, `width`, `height`, `sizeBytes`); the snake_case names in this TD's prose describe the domain model/DB columns, not the HTTP contract.
+- 2026-10-15 — The draft row carries a `title` column from Phase 03 on: `varchar(255) NOT NULL`, set at draft creation to `original_filename` with its extension stripped (the full filename when stripping leaves it empty), and exposed as `title` in the video response contract next to `filename`. The migration backfills existing rows the same way. The create-draft request does not accept a title, and editing it stays in Phase 04. The studio screens show `title` wherever they show the video's name today; `filename` stays for the download `Content-Disposition`. _Rationale:_ The assignment lists title among the minimum video fields, so its absence from the data model was an error, not a deferral. Deriving it from the filename keeps it non-empty with no new Phase 03 UI, and the 255 length matches `original_filename` so the default never truncates.
+- 2026-10-15 — In Phase 03 `title` is contract-only: it is persisted and exposed through the API response, `openapi.json`, the generated `types.gen.ts` and the MSW video fixtures, but no studio screen renders it. The Filename block keeps showing `filename`, the `/studio/videos/[publicId]` heading stays the static "Video details", and `UploadProgressPanel` keeps the local `File` name. This replaces the clause "The studio screens show `title` wherever they show the video's name today" of the previous entry; displaying and editing `title` both arrive with the Phase 04 details form. _Rationale:_ No Phase 03 screen shows a video name distinct from the file name, so rendering `title` would mean redesigning a screen whose inventory and OQ-7 resolution are settled (resolves AMB-6 of phase-03 validation).
 
 ### phase-03-videos/TD-07
 
@@ -457,16 +459,16 @@ _Source files:_
 | Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Enviar o arquivo do vídeo direto ao armazenamento em partes, de forma retomável | "Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance" | UploadProgressPanel |
 | Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Exibir o progresso do envio do arquivo de vídeo | "Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance" | UploadProgressPanel |
 | Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Concluir o envio e marcar o vídeo como enviado para processamento | "Processamento automático do vídeo após upload (extração de duração e metadados)" | UploadProgressPanel |
-| Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Acompanhar o status de processamento do vídeo após o envio | "Processamento automático do vídeo após upload (extração de duração e metadados)" | UploadProgressPanel (slot UploadStatusLabel) |
+| Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Acompanhar o status de processamento do vídeo após o envio | "Processamento automático do vídeo após upload (extração de duração e metadados)" | UploadProgressPanel, slot UploadStatusLabel |
 | Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Exibir os dados do rascunho do vídeo pré-cadastrado | "Pré-cadastro automático do vídeo como rascunho ao iniciar o upload" | CardVideoConfig |
-| Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Exibir a URL única do vídeo | "URL única por vídeo, sem conflito com outros vídeos" | CardVideoConfig (VideoLink) |
-| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Reproduzir o vídeo via streaming na prévia do studio | "Reprodução via streaming (sem necessidade de download completo)" | Video player |
-| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir a URL única do vídeo para compartilhamento | "URL única por vídeo, sem conflito com outros vídeos" | CardVideoConfig |
+| Tela do vídeo no studio — upload em andamento | /studio/videos/[publicId] | Exibir a URL única do vídeo | "URL única por vídeo, sem conflito com outros vídeos" | CardVideoConfig, VideoLink |
+| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Reproduzir o vídeo via streaming na prévia do studio | "Reprodução via streaming (sem necessidade de download completo)" | Video player (in CardVideoConfig) |
+| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir a URL única do vídeo para compartilhamento | "URL única por vídeo, sem conflito com outros vídeos" | CardVideoConfig (VideoLink) |
 | Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir metadados extraídos do vídeo (duração e qualidade) | "Processamento automático do vídeo após upload (extração de duração e metadados)" | CardVideoConfig |
-| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir o nome original do arquivo do vídeo pré-cadastrado | "Pré-cadastro automático do vídeo como rascunho ao iniciar o upload" | CardVideoConfig |
+| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir o nome original do arquivo do vídeo pré-cadastrado | "Pré-cadastro automático do vídeo como rascunho ao iniciar o upload" | CardVideoConfig (Filename block) |
 | Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Exibir a thumbnail gerada automaticamente | "Geração automática de thumbnail a partir de um frame do vídeo" | ThumbUpload |
 | Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Acompanhar o status de processamento do vídeo até um estado terminal | "Processamento automático do vídeo após upload (extração de duração e metadados)" | ProcessingStatus |
-| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Baixar o arquivo do vídeo processado | "Download do vídeo pelo usuário" | DownloadButton |
+| Tela do vídeo no studio — upload concluído (player + download) | /studio/videos/[publicId] | Baixar o arquivo do vídeo processado | "Download do vídeo pelo usuário" | DownloadButton (in CardVideoConfig) |
 
 ### Server-connected Components
 

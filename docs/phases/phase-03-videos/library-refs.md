@@ -33,7 +33,7 @@ libs:
     context7_id: "/fluent-ffmpeg/node-fluent-ffmpeg"
     fetched_at: "2026-10-07T14:44:00-03:00"
 sources_mtime:
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-14T09:18:25-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T12:44:52-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
 ---
 

@@ -3,9 +3,9 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-15T11:22:45-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-15T12:46:31-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-15T12:46:31-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T12:44:52-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
@@ -1358,6 +1358,111 @@ E2E da página (reprodução com `src` pré-assinado, download, estado `ready` v
 
 ---
 
+### SI-03.36 (amendment of SI-03.2) — Coluna `title` na entidade Video e migration AddVideoTitle
+
+**Description:** Adicionar o título do vídeo ao modelo de dados, conforme a revisão 2026-10-15 do TD-06 ("The draft row carries a `title` column from Phase 03 on"). O enunciado lista título entre os campos mínimos do vídeo; a coluna nasce não-nula, derivada do nome original do arquivo, e os vídeos já gravados recebem o mesmo valor pela migration.
+
+**Technical actions:**
+
+1. Adicionar `title` (`varchar(255)`, not null) em `src/videos/entities/video.entity.ts`, logo após `original_filename`, conforme `### Data Model` → `#### Video` (per `phase-03-videos/TD-06`, revisão 2026-10-15).
+2. Gerar `src/database/migrations/{timestamp}-AddVideoTitle.ts` via TypeORM CLI (`docker compose exec nestjs-api npm run typeorm -- migration:generate`) e ajustar o `up` gerado para três passos: (a) `ADD COLUMN "title" varchar(255)` nullable; (b) backfill `UPDATE "videos" SET "title" = COALESCE(NULLIF(regexp_replace("original_filename", '\.[^.]*$', ''), ''), "original_filename")` — remove só a última extensão e usa o nome completo quando a remoção deixa vazio (ex.: `.mp4`); (c) `ALTER COLUMN "title" SET NOT NULL`. O `down` faz `DROP COLUMN "title"` (per `phase-03-videos/TD-06`, revisão 2026-10-15: "The migration backfills existing rows the same way").
+
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `Video` entity | Integration: inserir um vídeo sem `title` viola o not-null; `title` salvo é lido de volta | `src/videos/entities/video.entity.integration-spec.ts` |
+| `AddVideoTitle` migration | Integration: aplica e reverte (`up`/`down`) sem erro; com linhas pré-existentes, o backfill grava `clip.final.mp4` → `clip.final`, `.mp4` → `.mp4` e `semextensao` → `semextensao` | `src/database/migrations.integration-spec.ts` |
+
+**Dependencies:** SI-03.2
+
+**Acceptance criteria:**
+
+- A tabela `videos` tem a coluna `title varchar(255) NOT NULL`.
+- Aplicar a migration num banco com vídeos já gravados preenche `title` a partir de `original_filename` sem falhar no `NOT NULL`.
+- A migration `AddVideoTitle` reverte sem erro, removendo a coluna.
+
+---
+
+### SI-03.37 (amendment of SI-03.5) — Título derivado no rascunho e `title` no `VideoResponseDto`
+
+**Description:** Preencher `title` ao criar o rascunho e expô-lo no contrato de resposta ao lado de `filename`, conforme a revisão 2026-10-15 do TD-06. O pedido de criação continua sem aceitar título, e a edição fica para a Fase 04.
+
+**Technical actions:**
+
+1. Criar `src/videos/video-title.util.ts` — `titleFromFilename(filename)`: remove só a última extensão (`/\.[^.]*$/`) e devolve o nome completo quando a remoção deixa a string vazia. A regra é a mesma do backfill da migration de SI-03.36 (per `phase-03-videos/TD-06`, revisão 2026-10-15).
+2. Em `VideosService.createDraft`, gravar `title: titleFromFilename(input.filename)` junto com `original_filename`; `CreateVideoDto` não muda (per `phase-03-videos/TD-06`, revisão 2026-10-15: "The create-draft request does not accept a title").
+3. Em `src/videos/dto/video-response.dto.ts`, adicionar `@ApiProperty({ example: 'holiday' }) title: string` logo após `filename` e mapear `title: video.title` em `toVideoResponse`, conforme `### API Contracts` → `VideoResponseDto` (per `openapi-docs-nestjs/TD-01`; response DTO leva `@ApiProperty` explícito, como os demais campos do DTO).
+
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `titleFromFilename` | Unit: `holiday.mp4` → `holiday`; `clip.final.mp4` → `clip.final`; `.mp4` → `.mp4`; `semextensao` → `semextensao` | `src/videos/video-title.util.spec.ts` |
+| `VideosService.createDraft` | Unit: o rascunho é salvo com `title` derivado de `filename` | `src/videos/videos.service.spec.ts` |
+| `toVideoResponse` | Unit: `title` da entidade aparece na resposta | `src/videos/dto/video-response.dto.spec.ts` |
+| `POST /videos` / `GET /videos/{publicId}` | E2E: a resposta traz `title` derivado do `filename` enviado | `test/videos-create.e2e-spec.ts`, `test/videos-get.e2e-spec.ts` |
+
+**Dependencies:** SI-03.5, SI-03.6, SI-03.7, SI-03.36
+
+**Acceptance criteria:**
+
+- `POST /videos` com `filename: "holiday.mp4"` retorna `201` com `title: "holiday"` e `filename: "holiday.mp4"`.
+- `GET /videos/{publicId}` do mesmo vídeo retorna o mesmo `title`.
+- Enviar `title` no corpo de `POST /videos` não altera o título gravado (o campo não faz parte de `CreateVideoDto`).
+
+---
+
+### SI-03.38 (amendment of SI-03.15) — Re-export do OpenAPI e regeneração dos tipos com `title`
+
+**Description:** Levar o novo campo `title` do `VideoResponseDto` ao contrato publicado e aos tipos do frontend. Na Fase 03 o `title` é só contrato: nenhuma tela o renderiza (revisão 2026-10-15 do TD-06, "In Phase 03 `title` is contract-only").
+
+**Technical actions:**
+
+1. Rodar `docker compose exec nestjs-api npm run openapi:export` (em `nestjs-project/`) e commitar `nestjs-project/openapi.json` (per `openapi-docs-nestjs/TD-02`).
+2. Rodar `bash scripts/sync-openapi.sh` na raiz do repo (host) e `docker compose exec next-frontend npm run openapi:types` (em `next-frontend/`); commitar `next-frontend/openapi.json` e `next-frontend/lib/api/types.gen.ts` no mesmo commit (per `next-frontend-openapi-typing/TD-02`, `next-frontend-openapi-typing/TD-03`).
+
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `openapi.json` export | Integration: o schema `VideoResponseDto` lista `title` como string obrigatória | `src/openapi-export.integration-spec.ts` |
+
+**Dependencies:** SI-03.15, SI-03.37
+
+**Acceptance criteria:**
+
+- `VideoResponseDto` em `nestjs-project/openapi.json` tem `title` (string) em `required`.
+- `next-frontend/openapi.json` é idêntico a `nestjs-project/openapi.json`, e `types.gen.ts` expõe `title: string` no schema do vídeo.
+- `docker compose exec next-frontend npx tsc --noEmit` sai com código 0.
+
+---
+
+### SI-03.39 (amendment of SI-03.18) — Fixtures MSW de vídeos com `title`
+
+**Description:** Manter o upstream falso alinhado ao contrato regenerado: as fixtures e o store em memória dos handlers de vídeos passam a devolver `title`. Nenhuma tela muda — o Filename block continua mostrando `filename`, o heading segue "Video details" e o `UploadProgressPanel` segue com o nome do `File` local (revisão 2026-10-15 do TD-06).
+
+**Technical actions:**
+
+1. Em `mocks/factories/videos.ts`, incluir em `buildVideo` o default `title: "holiday"`, coerente com o `filename: "holiday.mp4"` já usado (per `next-frontend-msw-foundation/TD-03`: defaults determinísticos escritos à mão).
+2. Em `mocks/handlers/videos.ts`, o `POST /videos` grava no store `title` derivado do `filename` do corpo com a mesma regra do backend (remove a última extensão; nome completo quando sobra vazio), num helper local do módulo de mocks — o frontend não importa código do backend (per `e2e-video-upload-fixtures/TD-02`).
+
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `mocks/handlers/videos.ts` | Integration (msw/node): `POST /videos` com `filename: "clip.final.mp4"` → `GET` do `publicId` devolve `title: "clip.final"` | `mocks/handlers/__tests__/videos.integration.test.ts` |
+
+**Dependencies:** SI-03.18, SI-03.38
+
+**Acceptance criteria:**
+
+- As fixtures de vídeo do MSW passam no `tsc --noEmit` com o `types.gen.ts` regenerado (que exige `title`).
+- Depois de um `POST /videos` no MSW, o `GET` do `publicId` devolve `title` derivado do `filename` enviado.
+- Nenhum componente de `components/studio/` passa a ler `title`.
+
+---
+
 ## Technical Specifications
 
 ### Data Model
@@ -1372,6 +1477,7 @@ Tabela `videos` (`@Entity('videos')`). Identificadores de domínio copiados verb
 | public_id | varchar(11) | unique, not null | Random 11-char base64url (64 bits) gerado com `node:crypto` (`randomBytes(8).toString('base64url')`) no service, antes do insert; colisão (unique violation) → regenera e tenta de novo (máx. 3) (phase-03-videos/TD-07) |
 | channel_id | uuid | FK → channels.id, not null, `ON DELETE CASCADE` | Dono do vídeo; a ownership é resolvida por `channels.user_id = JWT sub` |
 | original_filename | varchar(255) | not null | Nome original do arquivo, capturado no pré-cadastro (não vem do ffprobe) |
+| title | varchar(255) | not null | Título do vídeo, definido no pré-cadastro como `original_filename` sem a última extensão (nome completo quando a remoção deixa vazio); só leitura na Fase 03, editável na Fase 04 (phase-03-videos/TD-06, revisões 2026-10-15) |
 | processing_status | enum `video_processing_status` (`awaiting_upload`, `uploaded`, `processing`, `ready`, `failed`) | not null, default `awaiting_upload` | Ciclo de processamento (phase-03-videos/TD-06). `failed` é terminal — nenhuma transição sai de `failed` |
 | publication_status | enum `video_publication_status` (`draft`, `published`) | not null, default `draft` | Fase 03 só escreve `draft`; `published` existe no enum para o contrato OpenAPI ficar estável até a Fase 04 (phase-03-videos/TD-06) |
 | failure_reason | enum `video_failure_reason` (`not_a_video`, `unreadable_file`, `unsupported_media`, `processing_error`, `upload_abandoned`) | nullable | Preenchido só quando `processing_status = failed` (video-metadata/TD-04). stderr do ffmpeg vai só para logs do worker |
@@ -1406,6 +1512,7 @@ Layout derivado de forma determinística do `public_id` por um único helper do 
 
 - publicId: string — 11 caracteres base64url (phase-03-videos/TD-07)
 - filename: string — nome original do arquivo capturado no pré-cadastro
+- title: string — título derivado de `filename` no pré-cadastro (sem a última extensão); só contrato na Fase 03, nenhuma tela o renderiza (phase-03-videos/TD-06, revisões 2026-10-15)
 - processingStatus: `"awaiting_upload" | "uploaded" | "processing" | "ready" | "failed"` (phase-03-videos/TD-06)
 - publicationStatus: `"draft" | "published"` — sempre `"draft"` na Fase 03 (phase-03-videos/TD-06)
 - failureReason: `"not_a_video" | "unreadable_file" | "unsupported_media" | "processing_error" | "upload_abandoned"` | null — não-nulo só quando `processingStatus = "failed"` (video-metadata/TD-04)
@@ -1947,7 +2054,10 @@ Backend (nestjs-project)
 
 SI-03.1 (root — infra: deps, config, storage + redis no Compose, ffmpeg)
 ├── SI-03.2 — depends on SI-03.1 (entidade precisa das deps/config)
-│   └── SI-03.12 — depends on SI-03.1, SI-03.2 (adapter FFmpeg usa os enums de failure_reason)
+│   ├── SI-03.12 — depends on SI-03.1, SI-03.2 (adapter FFmpeg usa os enums de failure_reason)
+│   └── SI-03.36 — depends on SI-03.2 (amendment: coluna `title` + migration AddVideoTitle, TD-06 revisão 2026-10-15)
+│       └── SI-03.37 — depends on SI-03.5, SI-03.6, SI-03.7, SI-03.36 (amendment: `title` no rascunho e no VideoResponseDto)
+│           └── SI-03.38 — depends on SI-03.15, SI-03.37 (amendment: re-export do OpenAPI + types.gen.ts com `title`)
 ├── SI-03.3 — depends on SI-03.1 (storage precisa da config S3 e do serviço `storage`)
 │   └── SI-03.5 — depends on SI-03.2, SI-03.3 (service precisa da entidade e das keys/URL pública)
 │       └── SI-03.6 — depends on SI-03.4, SI-03.5 (controller sobre o service; módulo importa a fila)
@@ -1969,6 +2079,7 @@ Frontend (next-frontend) — cross-layer edge: SI-03.16 depends on SI-03.15 (bac
 SI-03.16 — depends on SI-03.15 (aliases derivados do `types.gen.ts` regenerado)
 ├── SI-03.17 — depends on SI-03.16 (helper tipado pelos aliases)
 ├── SI-03.18 — depends on SI-03.16 (fixtures tipadas)
+│   ├── SI-03.39 — depends on SI-03.18, SI-03.38 (amendment: fixtures MSW com `title`; cross-layer edge com SI-03.38)
 │   ├── SI-03.19 — depends on SI-03.18 (fake de storage usa a origem reservada exportada pelos handlers)
 │   ├── SI-03.20 — depends on SI-03.17, SI-03.18 (POST /api/videos)
 │   ├── SI-03.21 — depends on SI-03.17, SI-03.18 (GET /api/videos/{publicId})
@@ -2006,7 +2117,7 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
     └── SI-03.32b — depends on SI-03.32a, SI-03.31b, SI-03.24, SI-03.28
 ```
 
-**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.25` (+ amendment `SI-03.33`, antes de `SI-03.26`) a qualquer momento; frontend `SI-03.16 → SI-03.29` após `SI-03.15`; telas por último, na ordem `30 → 31 → 32`.
+**Ordem sugerida de execução:** backend `SI-03.1 → SI-03.15` (o worker `SI-03.11`–`SI-03.14` pode correr em paralelo aos endpoints depois de `SI-03.9`); bootstrap `SI-03.0.1 → SI-03.0.6` e `SI-03.25` (+ amendment `SI-03.33`, antes de `SI-03.26`) a qualquer momento; frontend `SI-03.16 → SI-03.29` após `SI-03.15`; telas por último, na ordem `30 → 31 → 32`. Amendments do `title` (TD-06 revisões 2026-10-15) em sequência: `SI-03.36 → SI-03.37 → SI-03.38 → SI-03.39`.
 
 ---
 
@@ -2059,6 +2170,10 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
 - [ ] SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
 - [ ] SI-03.34 (amendment of SI-03.1) — Infra: storage de dev/test em RustFS
 - [ ] SI-03.35 (amendment of SI-03.4) — Isolar a fila dos testes com um `prefix` próprio do BullMQ
+- [ ] SI-03.36 (amendment of SI-03.2) — Coluna `title` na entidade Video e migration AddVideoTitle
+- [ ] SI-03.37 (amendment of SI-03.5) — Título derivado no rascunho e `title` no `VideoResponseDto`
+- [ ] SI-03.38 (amendment of SI-03.15) — Re-export do OpenAPI e regeneração dos tipos com `title`
+- [ ] SI-03.39 (amendment of SI-03.18) — Fixtures MSW de vídeos com `title`
 
 **Per-screen deliverables:**
 
