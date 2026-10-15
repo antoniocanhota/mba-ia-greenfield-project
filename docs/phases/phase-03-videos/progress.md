@@ -1,6 +1,6 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
+**Status:** completed
 **SIs:** 45/45 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
@@ -438,3 +438,10 @@
   - Instalado `@uppy/react@^6.0.0` (6.0.0) sem os peers opcionais (`dashboard`, `status-bar`, `webcam`, `screen-capture`) nem `golden-retriever`. `package.json` lista só `@uppy/core`, `@uppy/aws-s3` e `@uppy/react`; `npm ls @uppy/core` mostra uma única versão (6.2.0, deduped).
   - **Dependências transitivas de `@uppy/*` no lockfile:** `@uppy/react` puxa `@uppy/components`, `@uppy/google-drive-picker` e `@uppy/google-photos-picker` (dependências de runtime dele, não declaradas no `package.json`). O critério "nenhum outro pacote `@uppy/*`" foi lido como sobre o `package.json`; os pickers do Google vêm junto de `@uppy/components` e não são importados pelo app.
   - O lock também mudou +104/−2 linhas (preact, use-sync-external-store e afins). Ação 2 (commitar) não executada: git fica com o usuário.
+
+## Final verification — 2026-10-15
+
+- Backend: 351 unit/integration + 79 E2E passing; `tsc --noEmit` exit 0.
+- Frontend: 245 tests passing; 24/24 Playwright passing (MSW); `tsc --noEmit` exit 0; lint exit 0.
+- OpenAPI contract fresh (no diff after export + sync + `openapi:types`).
+- **Follow-up (out of scope):** `npm run lint` in `nestjs-project` fails with 148 errors / 40 warnings (`no-unsafe-*`, `require-await`), all in files from earlier phases (`auth.service.spec.ts`, `test/auth.e2e-spec.ts`, `mail.service.integration-spec.ts`, `channels.service.spec.ts`, `channels.service.ts`, filter specs, `create-test-data-source.ts`). No phase-03 file is flagged. Needs a separate lint-cleanup task.
