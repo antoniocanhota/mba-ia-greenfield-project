@@ -57,6 +57,7 @@ describe('VideoSweepService (integration)', () => {
       public_id: publicId,
       channel_id: channel.id,
       original_filename: 'clip.mp4',
+      title: 'clip',
       processing_status: status,
     });
     const at = new Date(Date.now() - ageMs);

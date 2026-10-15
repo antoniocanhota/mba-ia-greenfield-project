@@ -81,6 +81,7 @@ function reservedVideo(publicId: string): VideoResponse | undefined {
       return buildVideo({
         publicId,
         filename: "my-video.mp4",
+        title: "my-video",
         processingStatus: "ready",
         durationMs: 83_000,
         width: 1920,
@@ -99,6 +100,13 @@ const lookup = (publicId: string): VideoResponse =>
   reservedVideo(publicId) ??
   store.get(publicId)?.video ??
   buildVideo({ publicId });
+
+// Mirrors the backend rule: filename without its last extension, or the whole
+// filename when stripping leaves nothing. The frontend never imports backend code.
+const titleFromFilename = (filename: string): string => {
+  const stripped = filename.replace(/\.[^.]*$/, "");
+  return stripped === "" ? filename : stripped;
+};
 
 interface CreateVideoBody {
   filename?: string;
@@ -127,9 +135,11 @@ export const handlers = [
     }
 
     const publicId = nextPublicId();
+    const filename = body.filename ?? "video.mp4";
     const video = buildVideo({
       publicId,
-      filename: body.filename ?? "video.mp4",
+      filename,
+      title: titleFromFilename(filename),
     });
     store.set(publicId, { video, declaredSizeBytes: body.sizeBytes ?? 0 });
     return HttpResponse.json<VideoResponse>(video, { status: 201 });

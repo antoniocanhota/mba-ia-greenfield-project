@@ -4,6 +4,7 @@ import { E2E_STORAGE_ORIGIN } from "@/mocks/storage-origin";
 const baseVideo: VideoResponse = {
   publicId: "dQw4w9WgXcQ",
   filename: "holiday.mp4",
+  title: "holiday",
   processingStatus: "awaiting_upload",
   publicationStatus: "draft",
   failureReason: null,

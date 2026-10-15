@@ -24,6 +24,7 @@ describe('Video entity (integration)', () => {
       public_id: 'abcDEF12345',
       channel_id: channel.id,
       original_filename: 'clip.mp4',
+      title: 'clip',
       ...overrides,
     });
 
@@ -79,6 +80,12 @@ describe('Video entity (integration)', () => {
     await channelRepository.delete({ id: channel.id });
 
     expect(await videoRepository.count()).toBe(0);
+  });
+
+  it('should reject a video without a title', async () => {
+    await expect(
+      videoRepository.save(buildVideo({ title: undefined })),
+    ).rejects.toThrow(QueryFailedError);
   });
 
   it('should read a 10 GiB size_bytes back as a number', async () => {

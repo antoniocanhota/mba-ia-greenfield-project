@@ -27,6 +27,7 @@ import {
   VideoNotReadyException,
 } from './exceptions/video.exceptions';
 import { generatePublicId, isPublicIdFormat } from './public-id.util';
+import { titleFromFilename } from './video-title.util';
 import { MAX_VIDEO_SIZE_BYTES } from './videos.constants';
 
 const PG_UNIQUE_VIOLATION = '23505';
@@ -80,6 +81,7 @@ export class VideosService {
             public_id: generatePublicId(),
             channel_id: channel.id,
             original_filename: input.filename,
+            title: titleFromFilename(input.filename),
           }),
         );
       } catch (error) {

@@ -877,6 +877,10 @@
             "type": "string",
             "example": "holiday.mp4"
           },
+          "title": {
+            "type": "string",
+            "example": "holiday"
+          },
           "processingStatus": {
             "allOf": [
               {
@@ -927,6 +931,7 @@
         "required": [
           "publicId",
           "filename",
+          "title",
           "processingStatus",
           "publicationStatus",
           "failureReason",

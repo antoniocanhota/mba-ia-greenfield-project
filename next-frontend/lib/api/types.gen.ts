@@ -322,6 +322,8 @@ export interface components {
             publicId: string;
             /** @example holiday.mp4 */
             filename: string;
+            /** @example holiday */
+            title: string;
             processingStatus: components["schemas"]["VideoProcessingStatus"];
             publicationStatus: components["schemas"]["VideoPublicationStatus"];
             failureReason: components["schemas"]["VideoFailureReason"] | null;

@@ -198,6 +198,7 @@ describe('exportSpec (integration)', () => {
       expect(Object.keys(schemas['VideoResponseDto'].properties)).toEqual(
         expect.arrayContaining([
           'publicId',
+          'title',
           'processingStatus',
           'publicationStatus',
           'failureReason',
@@ -205,6 +206,25 @@ describe('exportSpec (integration)', () => {
           'thumbnailUrl',
         ]),
       );
+    });
+
+    it('lists title as a required string on VideoResponseDto', () => {
+      const schemas = (
+        document.components as {
+          schemas: Record<
+            string,
+            {
+              properties: Record<string, { type?: string }>;
+              required: string[];
+            }
+          >;
+        }
+      ).schemas;
+
+      expect(schemas['VideoResponseDto'].properties['title'].type).toBe(
+        'string',
+      );
+      expect(schemas['VideoResponseDto'].required).toContain('title');
     });
   });
 });

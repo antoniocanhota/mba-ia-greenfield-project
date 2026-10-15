@@ -140,6 +140,7 @@ describe('VideoProcessingService (integration)', () => {
       public_id: PUBLIC_ID,
       channel_id: channel.id,
       original_filename: 'clip.mp4',
+      title: 'clip',
       processing_status: VideoProcessingStatus.UPLOADED,
     });
   });

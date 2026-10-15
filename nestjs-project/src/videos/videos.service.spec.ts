@@ -89,13 +89,14 @@ describe('VideosService', () => {
   });
 
   describe('createDraft', () => {
-    it('should save the draft on the channel of the user with the original filename', async () => {
+    it('should save the draft on the channel of the user with the original filename and a derived title', async () => {
       const video = await service.createDraft('user-id', INPUT);
 
       expect(channelsService.findByUserId).toHaveBeenCalledWith('user-id');
       expect(video).toMatchObject({
         channel_id: 'channel-id',
         original_filename: 'clip.mp4',
+        title: 'clip',
       });
       expect(video.public_id).toMatch(/^[A-Za-z0-9_-]{11}$/);
     });

@@ -37,6 +37,9 @@ export class Video {
   @Column({ type: 'varchar', length: 255 })
   original_filename: string;
 
+  @Column({ type: 'varchar', length: 255 })
+  title: string;
+
   @Column({
     type: 'enum',
     enum: VideoProcessingStatus,

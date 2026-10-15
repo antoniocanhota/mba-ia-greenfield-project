@@ -14,6 +14,7 @@ function makeVideo(overrides: Partial<Video> = {}): Video {
     public_id: 'abcDEF12345',
     channel_id: 'channel-uuid',
     original_filename: 'clip.mp4',
+    title: 'clip',
     processing_status: VideoProcessingStatus.AWAITING_UPLOAD,
     publication_status: VideoPublicationStatus.DRAFT,
     failure_reason: null,
@@ -44,6 +45,7 @@ describe('toVideoResponse', () => {
     expect(response).toEqual({
       publicId: 'abcDEF12345',
       filename: 'clip.mp4',
+      title: 'clip',
       processingStatus: 'failed',
       publicationStatus: 'draft',
       failureReason: 'not_a_video',

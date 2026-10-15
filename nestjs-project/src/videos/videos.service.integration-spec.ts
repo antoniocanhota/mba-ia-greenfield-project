@@ -137,6 +137,7 @@ describe('VideosService (integration)', () => {
       const stored = await videoRepository.findOneByOrFail({ id: video.id });
       expect(stored.channel_id).toBe(ownerChannel.id);
       expect(stored.original_filename).toBe('clip.mp4');
+      expect(stored.title).toBe('clip');
       expect(stored.processing_status).toBe(
         VideoProcessingStatus.AWAITING_UPLOAD,
       );
@@ -149,6 +150,7 @@ describe('VideosService (integration)', () => {
         public_id: 'AAAAAAAAAAA',
         channel_id: ownerChannel.id,
         original_filename: 'existing.mp4',
+        title: 'existing',
       });
       jest
         .spyOn(publicIdUtil, 'generatePublicId')

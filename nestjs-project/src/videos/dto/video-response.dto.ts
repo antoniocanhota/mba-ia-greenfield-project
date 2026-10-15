@@ -14,6 +14,9 @@ export class VideoResponseDto {
   @ApiProperty({ example: 'holiday.mp4' })
   filename: string;
 
+  @ApiProperty({ example: 'holiday' })
+  title: string;
+
   @ApiProperty({
     enum: VideoProcessingStatus,
     enumName: 'VideoProcessingStatus',
@@ -62,6 +65,7 @@ export function toVideoResponse(
   return {
     publicId: video.public_id,
     filename: video.original_filename,
+    title: video.title,
     processingStatus: video.processing_status,
     publicationStatus: video.publication_status,
     failureReason: video.failure_reason,

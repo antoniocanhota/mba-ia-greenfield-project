@@ -95,6 +95,7 @@ describe('videos-get (e2e)', () => {
     const body = res.body as Record<string, unknown>;
     expect(body.publicId).toBe(publicId);
     expect(body.filename).toBe('my-video.mp4');
+    expect(body.title).toBe('my-video');
     expect(body.processingStatus).toBe('awaiting_upload');
     expect(body.publicationStatus).toBe('draft');
     expect(body).not.toHaveProperty('id');

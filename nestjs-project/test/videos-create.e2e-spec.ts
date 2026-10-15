@@ -86,6 +86,7 @@ describe('videos-create (e2e)', () => {
     const body = res.body as Record<string, unknown>;
     expect(body.publicId).toMatch(/^[A-Za-z0-9_-]{11}$/);
     expect(body.filename).toBe('my-video.mp4');
+    expect(body.title).toBe('my-video');
     expect(body.processingStatus).toBe('awaiting_upload');
     expect(body.publicationStatus).toBe('draft');
     for (const field of [
@@ -110,6 +111,17 @@ describe('videos-create (e2e)', () => {
     expect(stored.processing_status).toBe('awaiting_upload');
     expect(stored.publication_status).toBe('draft');
     expect(stored.channel_id).toBe(channel.id);
+    expect(stored.title).toBe('my-video');
+  });
+
+  it('titulo-fora-do-contrato-de-criacao-400', async () => {
+    const res = await postVideo({
+      ...VALID_BODY,
+      title: 'Custom title',
+    }).expect(400);
+    expect((res.body as { error: string }).error).toBe('VALIDATION_ERROR');
+
+    expect(await dataSource.getRepository(Video).count()).toBe(0);
   });
 
   it('validacao-dto-400', async () => {

@@ -88,6 +88,26 @@ describe("videos MSW handlers", () => {
       });
     });
 
+    it("derives the draft title from the filename without its last extension", async () => {
+      const { video } = await createDraft("clip.final.mp4");
+
+      const read = (await (
+        await call(`/videos/${video.publicId}`)
+      ).json()) as VideoResponse;
+
+      expect(video.title).toBe("clip.final");
+      expect(read).toMatchObject({
+        filename: "clip.final.mp4",
+        title: "clip.final",
+      });
+    });
+
+    it("keeps the whole filename as the title when stripping the extension leaves nothing", async () => {
+      const { video } = await createDraft(".mp4");
+
+      expect(video.title).toBe(".mp4");
+    });
+
     it("answers the default awaiting_upload fixture for an unknown, non-reserved id", async () => {
       const res = await call("/videos/unknownVid1");
 
