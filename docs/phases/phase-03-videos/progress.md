@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
-**SIs:** 46/46 completed
+**Status:** completed
+**SIs:** 47/47 completed
 
 ### SI-03.0.1 — Infra: install batch shadcn primitives
 - **Status:** completed
@@ -448,9 +448,27 @@
   - Ação 2: o comentário do `storage` em `compose.yaml` agora cita `phase-03-videos/TD-01` (revisão 2026-10-15) em vez de descrever a troca como desvio.
   - Ainda dizem "MinIO", fora do escopo deste SI: o Setup dos specs `videos-upload-signatures`, `videos-upload-completion` e `videos-media-urls` (linha 19), e a prosa de `e2e-video-upload-fixtures/TD-01`. Commit: git fica com o usuário.
 
+### SI-03.35 (amendment of SI-03.4) — Isolar a fila dos testes com um `prefix` próprio do BullMQ
+- **Status:** completed
+- **Tests:** 17 passing (`env.validation.integration-spec.ts` + `queue.module.spec.ts`); E2E `videos-upload-completion.e2e-spec.ts` 6/6 passing com o `video-worker` rodando (inclui `chamada-repetida-idempotente`, que falhava antes); `tsc --noEmit` exit 0; eslint sem erros nos arquivos tocados
+- **Observations:**
+  - Appended by /plan-build append-mode on 2026-10-15; tracks delta from phase-03-videos/TD-02 Revision 2026-10-15.
+  - O default `bull` virou a constante `DEFAULT_QUEUE_PREFIX` em `src/queue/queue.constants.ts`, usada por `queue.config.ts` e pelo Joi, para não duplicar o literal; o prefixo de teste é `TEST_QUEUE_PREFIX`, exportado pelo próprio setup `src/test/test-queue-prefix.ts` e usado na asserção do `queue.module.spec.ts`.
+  - O `video-worker` (watch mode) recarregou sozinho com o código novo e segue no prefixo `bull` (chaves `bull:videos:*` presentes, sem erros). Antes da troca, o log do worker tinha `Missing key for job … moveToDelayed`: era o worker antigo pegando jobs de teste que os testes apagavam em seguida.
+  - Depois das suítes, `streamtube-test:*` não tem chaves no Redis porque os testes limpam as filas no teardown; a prova de que o prefixo é aplicado é o `queue.module.spec.ts` (`queue.opts.prefix === 'streamtube-test'`).
+  - A suíte E2E completa fica para a verificação final.
+
 ## Final verification — 2026-10-15
 
 - Backend: 351 unit/integration + 79 E2E passing; `tsc --noEmit` exit 0.
 - Frontend: 245 tests passing; 24/24 Playwright passing (MSW); `tsc --noEmit` exit 0; lint exit 0.
 - OpenAPI contract fresh (no diff after export + sync + `openapi:types`).
 - **Follow-up (out of scope):** `npm run lint` in `nestjs-project` fails with 148 errors / 40 warnings (`no-unsafe-*`, `require-await`), all in files from earlier phases (`auth.service.spec.ts`, `test/auth.e2e-spec.ts`, `mail.service.integration-spec.ts`, `channels.service.spec.ts`, `channels.service.ts`, filter specs, `create-test-data-source.ts`). No phase-03 file is flagged. Needs a separate lint-cleanup task.
+
+## Final verification — 2026-10-15 (after SI-03.34 and SI-03.35)
+
+- Backend: 354 unit/integration passing. In the full run, `auth.service.integration-spec.ts` hit a 5s `beforeAll` timeout: it was the first suite, started cold, while the frontend suites were loading the machine. Rerun alone, it passed 25/25. 79/79 E2E passing **with `video-worker` up** (the `chamada-repetida-idempotente` failure is fixed by SI-03.35). `tsc --noEmit` exit 0.
+- Frontend: 245/245 Vitest. Playwright: the first full run had 4 `page.goto` timeouts in the first wave (cold route compilation); each spec passed alone, and a second full run passed 24/24. `tsc --noEmit` exit 0; lint exit 0 (1 pre-existing `react-hooks/incompatible-library` warning in `signup-form.tsx`).
+- OpenAPI contract fresh (no diff).
+- **Follow-up (unchanged):** backend `eslint` (run without `--fix`) still reports 148 errors / 40 warnings, all in phase 01/02 files. No phase-03 or SI-03.35 file is flagged.
+- **Follow-ups (out of scope):** a committed debug `console.log(error, data, response)` in `next-frontend/app/api/auth/login/route.ts:13` (commit f52078c); "MinIO" wording in the Setup of the `videos-upload-signatures`, `videos-upload-completion` and `videos-media-urls` specs and in `e2e-video-upload-fixtures/TD-01`; the frontend dev server sometimes loses MSW interception (login hits the real Nest) and corrupts `.next/dev/types/*.ts`, which is fixed by deleting those files and starting a single dev server.

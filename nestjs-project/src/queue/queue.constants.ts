@@ -1,4 +1,6 @@
 export const VIDEOS_QUEUE = 'videos';
+// BullMQ's own default key prefix; tests override it so the dev worker never sees their jobs.
+export const DEFAULT_QUEUE_PREFIX = 'bull';
 export const PROCESS_VIDEO_JOB = 'process-video';
 export const SWEEP_VIDEOS_JOB = 'sweep-videos';
 

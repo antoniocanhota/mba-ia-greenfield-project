@@ -4,9 +4,9 @@ name: phase-03-videos
 status: clean
 issue_count: 0
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-15T10:03:23-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-15T11:22:45-03:00"
   docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T09:54:02-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
 issues:

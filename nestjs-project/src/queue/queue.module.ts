@@ -14,6 +14,7 @@ import { VIDEOS_QUEUE } from './queue.constants';
       inject: [queueConfig.KEY],
       useFactory: (queue: ConfigType<typeof queueConfig>) => ({
         connection: { host: queue.host, port: queue.port },
+        prefix: queue.prefix,
       }),
     }),
     BullModule.registerQueue({ name: VIDEOS_QUEUE }),

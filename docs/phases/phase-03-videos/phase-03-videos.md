@@ -3,9 +3,9 @@ kind: phase
 name: phase-03-videos
 test_specs_aware: true
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-15T10:03:23-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-15T11:22:45-03:00"
   docs/phases/phase-03-videos/library-refs.md: "2026-10-15T09:42:43-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T09:54:02-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-09-28T14:55:47-03:00"
@@ -1329,6 +1329,35 @@ E2E da página (reprodução com `src` pré-assinado, download, estado `ready` v
 
 ---
 
+### SI-03.35 (amendment of SI-03.4) — Isolar a fila dos testes com um `prefix` próprio do BullMQ
+
+**Description:** Fazer os testes usarem um `prefix` de chaves do BullMQ diferente do de dev, conforme a revisão 2026-10-15 do TD-02. O `video-worker` do Compose usa o mesmo Redis e a mesma fila `videos` dos testes que sobem o `AppModule`; ele consumia o job `process-video` desses testes e avançava o vídeo para `processing` no meio do E2E. Com prefixos distintos, o worker de dev nunca enxerga jobs de teste e pode continuar rodando durante a suíte.
+
+**Technical actions:**
+
+1. Estender `src/config/queue.config.ts` (`registerAs('queue')`) com `prefix` lido de `QUEUE_PREFIX`, default `bull` — o mesmo default do BullMQ, então dev não muda (per `phase-03-videos/TD-02`, revisão 2026-10-15; `phase-01-configuracao-base/TD-03`).
+2. Adicionar `QUEUE_PREFIX: Joi.string().default('bull')` ao schema de `src/config/env.validation.ts` e a chave `QUEUE_PREFIX=bull` ao `.env.example` (per `phase-01-configuracao-base/TD-02`).
+3. Em `src/queue/queue.module.ts`, o `useFactory` do `BullModule.forRootAsync` passa a retornar `{ connection: { host, port }, prefix: queue.prefix }` — `prefix` é opção de `QueueOptions`/`WorkerOptions` do BullMQ v6, então vale para a fila da API e para o worker (per `phase-03-videos/TD-02`, revisão 2026-10-15).
+4. Criar `src/test/test-queue-prefix.ts`, que atribui `process.env.QUEUE_PREFIX = 'streamtube-test'` (atribuição direta, sobrescrevendo o valor vindo do `.env` ou do container), e registrá-lo em `setupFiles` logo após `dotenv/config` no Jest do `package.json` e em `test/jest-e2e.json` (per `phase-03-videos/TD-02`, revisão 2026-10-15).
+5. Atualizar `nestjs-project/CLAUDE.md` § "Test execution": os testes usam o prefixo `streamtube-test` do BullMQ, então o `video-worker` pode ficar rodando durante as suítes.
+
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `env.validation.ts` | Integration: `QUEUE_PREFIX` ausente assume o default `bull`; valor explícito é preservado | `src/config/env.validation.integration-spec.ts` |
+| `QueueModule` | Unit (compilação): a fila `videos` registrada usa o `prefix` vindo da config (`streamtube-test` sob o setup de teste) | `src/queue/queue.module.spec.ts` |
+
+**Dependencies:** SI-03.1, SI-03.4
+
+**Acceptance criteria:**
+
+- Com o `video-worker` rodando, `docker compose exec nestjs-api npm run test:e2e` passa por completo, incluindo `videos-upload-completion` › `chamada-repetida-idempotente`.
+- Sem `QUEUE_PREFIX` definido, a API e o worker sobem com o prefixo `bull`; os jobs de dev continuam sendo consumidos normalmente pelo `video-worker`.
+- Os testes que sobem o `AppModule` registram a fila `videos` com o prefixo `streamtube-test`.
+
+---
+
 ## Technical Specifications
 
 ### Data Model
@@ -1927,6 +1956,7 @@ SI-03.1 (root — infra: deps, config, storage + redis no Compose, ffmpeg)
 │                   └── SI-03.9 — depends on SI-03.8 (completion só faz sentido após o multipart assinado)
 │                       └── SI-03.10 — depends on SI-03.9 (media URLs exigem o fluxo até `ready`)
 ├── SI-03.4 — depends on SI-03.1 (fila precisa do Redis e da config)
+│   └── SI-03.35 — depends on SI-03.1, SI-03.4 (amendment: prefixo próprio do BullMQ nos testes, TD-02 revisão 2026-10-15)
 ├── SI-03.34 — depends on SI-03.1 (amendment: storage de dev/test em RustFS, TD-01 revisão 2026-10-15)
 └── SI-03.11 — depends on SI-03.3, SI-03.4 (worker importa storage e fila)
     └── SI-03.13 — depends on SI-03.9, SI-03.11, SI-03.12 (processor consome o job enfileirado no completion)
@@ -2028,6 +2058,7 @@ SI-03.32.0 — depends on SI-03.31.0 (prior decisions da mesma rota), SI-03.0.3 
 - [ ] SI-03.32b — Tela do vídeo no studio — upload concluído (lógica & wiring)
 - [ ] SI-03.33 (amendment of SI-03.25) — Infra: instalar `@uppy/react`
 - [ ] SI-03.34 (amendment of SI-03.1) — Infra: storage de dev/test em RustFS
+- [ ] SI-03.35 (amendment of SI-03.4) — Isolar a fila dos testes com um `prefix` próprio do BullMQ
 
 **Per-screen deliverables:**
 

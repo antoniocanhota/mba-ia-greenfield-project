@@ -3,7 +3,7 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-09-28T14:55:47-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T09:54:02-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T11:17:07-03:00"
   docs/decisions/technical-decisions-video-metadata.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-e2e-video-upload-fixtures.md: "2026-10-13T14:25:28-03:00"
   docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-09-28T14:55:47-03:00"
@@ -58,6 +58,7 @@ sources_mtime:
 | phase-03-videos/TD-01 | phase | Backend | Object Storage Service (dev) and S3 Client | decided | A (MinIO) | @aws-sdk/client-s3, @aws-sdk/s3-request-presigner |
 |     └─ Last revision: 2026-10-15 — Dev/test storage switched from MinIO to RustFS (`rustfs/rustfs:1.0.1`), activat… | | | | | | |
 | phase-03-videos/TD-02 | phase | Backend | Background Job Queue | decided | A (BullMQ + Redis) | bullmq, @nestjs/bullmq |
+|     └─ Last revision: 2026-10-15 — Tests isolate their queue with a dedicated BullMQ `prefix`: `QUEUE_PREFIX` in… | | | | | | |
 | phase-03-videos/TD-03 | phase | Backend | Video Worker Runtime Topology | decided | A (Same Nest codebase, separate entrypoint and Compose service) | — |
 | phase-03-videos/TD-04 | phase | Cross-layer | Large-File Upload Protocol (10GB, resumable) | decided | A (presigned S3 multipart) | — |
 |     └─ Last revision: 2026-10-07 — This replaces the "aborted best-effort via `signRequest`" clause in the previous… | | | | | | |
@@ -119,6 +120,9 @@ _Source files:_
 
 **Recommendation:** It is the only option with a first-party Nest 11 integration that fits the CommonJS build. Its progress API and stalled-job detection match long FFmpeg jobs, and `jobId = videoId` makes enqueue idempotent, which contains the dual-write risk with a simple sweep. pg-boss's transactional enqueue is a genuine advantage, but here it costs an ESM migration or a pinned old major plus a hand-written integration.
 **Libraries:** bullmq, @nestjs/bullmq
+
+**Revisions:**
+- 2026-10-15 — Tests isolate their queue with a dedicated BullMQ `prefix`: `QUEUE_PREFIX` in the `queue` config namespace (default `bull`, BullMQ's own) feeds `BullModule.forRootAsync`, and the Jest integration/E2E setup sets a test-only prefix. _Rationale:_ The `video-worker` Compose service (TD-03) shares Redis and the `videos` queue with the test runs, so it consumed test `process-video` jobs and moved videos to `processing` mid-test (`videos-upload-completion` E2E `chamada-repetida-idempotente` failed whenever the worker was up; it passed 6/6 with the worker stopped). A prefix separates test keys from dev keys in the same Redis without a second container or stopping the worker, and keeps Option A unchanged.
 
 ### phase-03-videos/TD-03
 

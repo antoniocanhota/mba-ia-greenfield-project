@@ -99,6 +99,8 @@ docker compose exec nestjs-api npm run test:e2e   # already configured
 
 Parallel execution causes FK violations, deadlocks, and cross-suite contamination because suites truncate or seed shared tables concurrently.
 
+Both Jest configs load `src/test/test-queue-prefix.ts` after `dotenv/config`, which sets `QUEUE_PREFIX=streamtube-test`. Test queues live under their own BullMQ key prefix in the shared Redis, so the `video-worker` container (prefix `bull`) can stay up during the suites — it never consumes test jobs.
+
 During active development, run only the tests related to the file being changed (`npm test -- path/to/file.spec.ts`). Before declaring a task done, run the full suite — see the global `CLAUDE.md` → "Definition of Done (Technical)".
 
 ## Long-running Processes

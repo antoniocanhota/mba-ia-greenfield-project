@@ -1,3 +1,4 @@
+import { DEFAULT_QUEUE_PREFIX } from '../queue/queue.constants';
 import { envValidationSchema } from './env.validation';
 
 const requiredEnv = {
@@ -93,5 +94,17 @@ describe('envValidationSchema — storage and queue', () => {
     expect(value.REDIS_PORT).toBe(6380);
     expect(value.UPLOAD_SIGN_TTL_SECONDS).toBe(60);
     expect(value.VIDEO_URL_TTL_SECONDS).toBe(120);
+  });
+
+  it('should default QUEUE_PREFIX to the BullMQ prefix when it is not set', () => {
+    const { value, error } = validate({});
+    expect(error).toBeUndefined();
+    expect(value.QUEUE_PREFIX).toBe(DEFAULT_QUEUE_PREFIX);
+  });
+
+  it('should keep an explicitly provided QUEUE_PREFIX', () => {
+    const { value, error } = validate({ QUEUE_PREFIX: 'custom-prefix' });
+    expect(error).toBeUndefined();
+    expect(value.QUEUE_PREFIX).toBe('custom-prefix');
   });
 });

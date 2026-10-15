@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { DEFAULT_QUEUE_PREFIX } from '../queue/queue.constants';
 
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -30,5 +31,6 @@ export const envValidationSchema = Joi.object({
   VIDEO_URL_TTL_SECONDS: Joi.number().integer().positive().default(14400),
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().port().default(6379),
+  QUEUE_PREFIX: Joi.string().default(DEFAULT_QUEUE_PREFIX),
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').default('false'),
 });

@@ -94,6 +94,10 @@ _Subprojects in scope:_
 **Decision:** A (BullMQ + Redis)
 **Libraries:** bullmq, @nestjs/bullmq
 
+**Revisions:**
+
+- 2026-10-15 — Tests isolate their queue with a dedicated BullMQ `prefix`: `QUEUE_PREFIX` in the `queue` config namespace (default `bull`, BullMQ's own) feeds `BullModule.forRootAsync`, and the Jest integration/E2E setup sets a test-only prefix. _Rationale:_ The `video-worker` Compose service (TD-03) shares Redis and the `videos` queue with the test runs, so it consumed test `process-video` jobs and moved videos to `processing` mid-test (`videos-upload-completion` E2E `chamada-repetida-idempotente` failed whenever the worker was up; it passed 6/6 with the worker stopped). A prefix separates test keys from dev keys in the same Redis without a second container or stopping the worker, and keeps Option A unchanged.
+
 ---
 
 ## TD-03: Video Worker Runtime Topology
