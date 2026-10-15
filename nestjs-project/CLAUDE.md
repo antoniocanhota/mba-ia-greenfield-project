@@ -150,6 +150,39 @@ Whenever possible, prefer storing only the bare address in `.env` and composing 
 
 `tsc` (and therefore `nest build`) only emits compiled `.ts` files to `dist/`. Any non-TypeScript runtime asset — Handlebars templates (`.hbs`), JSON fixtures, static config files, etc. — must be declared in `nest-cli.json` under `compilerOptions.assets` (with `watchAssets: true` for dev). Without that, the file exists in `src/` but is missing in `dist/` and runtime fails only after build.
 
+## Videos (Phase 03)
+
+`VideosModule` (`src/videos/`) owns the `Video` entity and the owner-only endpoints below (all require a JWT; unknown or foreign `publicId` → 404). Videos are addressed by an 11-char base64url `public_id`, never by the internal UUID. `@SkipThrottle()` is applied because multipart signing issues thousands of requests per file.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /videos` | Pre-register a draft on the user's channel; returns the `publicId`. `title` is derived from the file name (`video-title.util.ts`). |
+| `GET /videos/:publicId` | Current state of the video (owner only). |
+| `POST /videos/:publicId/upload-signatures` | Target of the Uppy `signRequest`: presigns one S3 multipart operation for the original. Only while `awaiting_upload`; 409 otherwise. |
+| `POST /videos/:publicId/upload-completion` | Verifies the uploaded object (max 10 GiB, `MAX_VIDEO_SIZE_BYTES`), moves `awaiting_upload` → `uploaded` with a conditional UPDATE and enqueues `process-video`. Idempotent once past `awaiting_upload`; rejected if the video is `failed`. |
+| `GET /videos/:publicId/media-urls` | Presigned streaming and download URLs; 409 unless `ready`. |
+
+The browser uploads **directly to object storage** (S3 multipart, presigned by the API); video bytes never pass through the API.
+
+### Status lifecycle
+
+`processing_status` (`VideoProcessingStatus`): `awaiting_upload` → `uploaded` → `processing` → `ready` | `failed`. `failed` carries a `failure_reason` (`not_a_video`, `unreadable_file`, `unsupported_media`, `processing_error`, `upload_abandoned`). Publication is a separate axis, `VideoPublicationStatus` (`draft` | `published`).
+
+### Storage (`src/storage/`)
+
+Single bucket, key layout defined in `storage-keys.ts`:
+
+- `videos/{publicId}/original` — upload target; deleted once processing reaches a terminal status
+- `videos/{publicId}/video.mp4` — normalized MP4 (faststart), served via presigned URLs
+- `thumbnails/{publicId}.jpg` — JPEG thumbnail, the only prefix with a public-read bucket policy (`StorageBucketInitializer`)
+
+### Queue and worker
+
+- Queue `videos` (BullMQ on Redis, `src/queue/`), key prefix `QUEUE_PREFIX` (default `bull`; tests use `streamtube-test`).
+- The worker is a separate process (`src/worker.ts`, `WorkerModule`; `npm run start:worker[:dev]`; Compose service `video-worker`) running `VideoProcessor` (`src/video-processing/`).
+- Job `process-video` (`jobId` = video id, 3 attempts, exponential backoff): downloads the original, probes it, normalizes with FFmpeg (transcode only when needed), generates the thumbnail, uploads both, re-probes for authoritative metadata (`duration_ms`, `width`, `height`, `size_bytes`) and sets `ready`. Permanent media errors fail immediately (`UnrecoverableError`); transient errors retry and mark `processing_error` only on the final attempt.
+- Job `sweep-videos` (repeatable scheduler, every 15 min): marks drafts older than 24 h as `failed`/`upload_abandoned` (aborting their multipart uploads) and re-enqueues videos stuck in `uploaded` for more than 5 min (covers a lost enqueue).
+
 ## Architecture
 
 NestJS with standard module structure. Source lives in `src/`, compiled output in `dist/`.
